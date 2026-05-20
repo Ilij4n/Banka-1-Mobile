@@ -61,6 +61,7 @@ enum class DrawerMenuItem(
 ) {
     DASHBOARD(Icons.Default.Home, "Pocetna", Routes.MainFlow.Dashboard),
     ACCOUNTS(Icons.Default.AccountBalance, "Racuni i kartice", Routes.MainFlow.Accounts),
+    PAYMENTS(Icons.Default.Payment, "Placanja", Routes.MainFlow.Payments),
     HISTORY(Icons.Default.Receipt, "Istorija", Routes.MainFlow.History),
     EXCHANGE(Icons.Default.CurrencyExchange, "Menjacnica", Routes.MainFlow.Exchange),
     VERIFICATION(Icons.Default.VerifiedUser, "Verifikacija", Routes.MainFlow.Verification),

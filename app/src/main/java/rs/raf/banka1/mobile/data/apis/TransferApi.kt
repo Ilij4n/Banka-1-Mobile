@@ -12,10 +12,10 @@ import rs.raf.banka1.mobile.data.remote.responses.TransferResponseDto
 
 interface TransferApi {
 
-    @POST("transfers/")
+    @POST("transfers")
     suspend fun createTransfer(@Body request: TransferRequestDto): NetworkResult<TransferResponseDto>
 
-    @GET("transfers/")
+    @GET("transfers")
     suspend fun getTransfers(
         @Query("clientId") clientId: Long,
         @Query("page") page: Int = 0,
