@@ -1,6 +1,10 @@
 package rs.raf.banka1.mobile.presentation.viewmodels.main
 
+import android.net.Uri
+import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.viewModelScope
+import com.squareup.moshi.Moshi
+import com.squareup.moshi.kotlin.reflect.KotlinJsonAdapterFactory
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
@@ -13,6 +17,8 @@ import rs.raf.banka1.mobile.data.remote.requests.NewPaymentDto
 import rs.raf.banka1.mobile.data.remote.requests.ValidateRequest
 import rs.raf.banka1.mobile.data.remote.responses.AccountDetailsResponseDto
 import rs.raf.banka1.mobile.data.repository.UserPreferencesRepository
+import rs.raf.banka1.mobile.domain.ips.IpsFields
+import rs.raf.banka1.mobile.domain.ips.IpsStringParser
 import rs.raf.banka1.mobile.presentation.components.ErrorData
 import rs.raf.banka1.mobile.presentation.viewmodels.BaseMviViewModel
 import java.util.UUID
@@ -20,16 +26,72 @@ import javax.inject.Inject
 
 @HiltViewModel
 class PaymentViewModel @Inject constructor(
+    private val savedStateHandle: SavedStateHandle,
     private val accountApi: AccountApi,
     private val verificationApi: VerificationApi,
     private val transactionApi: TransactionApi,
-    private val userPrefs: UserPreferencesRepository
+    private val userPrefs: UserPreferencesRepository,
+    private val ipsParser: IpsStringParser
 ) : BaseMviViewModel<PaymentContract.UiState, PaymentContract.UiEvent, PaymentContract.SideEffect>(
     PaymentContract.UiState()
 ) {
 
+    private val moshi = Moshi.Builder().add(KotlinJsonAdapterFactory()).build()
+    private val ipsAdapter = moshi.adapter(IpsFields::class.java)
+
     init {
+        prefillFromIpsPayload()
         loadAccounts()
+    }
+
+    private fun prefillFromIpsPayload() {
+        try {
+            val encoded = savedStateHandle.get<String>("ipsPayload") ?: return
+            val json = Uri.decode(encoded)
+            val fields = ipsAdapter.fromJson(json) ?: return
+            applyIpsFields(fields)
+        } catch (_: Exception) {}
+    }
+
+    private fun applyIpsFields(fields: IpsFields) {
+        setState {
+            copy(
+                fromIps = true,
+                toAccountNumber = fields.recipientAccount,
+                recipientName = fields.recipientName,
+                amountInput = fields.amount?.let {
+                    val intPart = it.toLong()
+                    val decPart = Math.round((it - intPart) * 100)
+                    "$intPart,${decPart.toString().padStart(2, '0')}"
+                } ?: "",
+                paymentCode = fields.paymentCode?.takeIf { it.matches(Regex("^2\\d{2}$")) } ?: "289",
+                paymentPurpose = fields.purpose?.takeIf { it.isNotBlank() } ?: "Plaćanje",
+                referenceNumber = fields.referenceNumber ?: "",
+                fieldErrors = emptyMap()
+            )
+        }
+        // Prefer an RSD/tekuci account if accounts are already loaded.
+        val accounts = state.value.accounts
+        if (accounts.isNotEmpty()) {
+            val rsd = accounts.filter { (it.currency ?: "").equals("RSD", ignoreCase = true) }
+            val tekuci = rsd.filter { acc ->
+                val combined = "${acc.tip ?: ""} ${acc.accountType ?: ""} ${acc.accountCategory ?: ""}"
+                combined.contains("TEKUCI", ignoreCase = true) || combined.contains("CURRENT", ignoreCase = true)
+            }
+            val preferred = tekuci.firstOrNull() ?: rsd.firstOrNull()
+            if (preferred != null) setState { copy(fromAccount = preferred) }
+        }
+    }
+
+    private fun handleIpsQrScanned(raw: String) {
+        ipsParser.parse(raw).fold(
+            onSuccess = { fields -> applyIpsFields(fields) },
+            onFailure = { error ->
+                setState {
+                    copy(error = ErrorData(title = "Greška", message = error.message ?: "Neispravan IPS QR kod"))
+                }
+            }
+        )
     }
 
     override fun setEvent(event: PaymentContract.UiEvent) {
@@ -43,6 +105,7 @@ class PaymentViewModel @Inject constructor(
             is PaymentContract.UiEvent.ClearError -> setState { copy(error = null) }
             is PaymentContract.UiEvent.OpenVerificationCodes -> sendEffect { PaymentContract.SideEffect.OpenVerificationCodes }
             is PaymentContract.UiEvent.DismissResult -> setState { copy(paymentResult = null) }
+            is PaymentContract.UiEvent.IpsQrScanned -> handleIpsQrScanned(event.rawString)
         }
     }
 
@@ -50,12 +113,29 @@ class PaymentViewModel @Inject constructor(
         viewModelScope.launch {
             setState { copy(isLoading = true) }
             when (val result = accountApi.getMyAccounts(page = 0, size = 50)) {
-                is NetworkResult.Success -> setState {
-                    copy(
-                        isLoading = false,
-                        accounts = result.data.content ?: emptyList(),
-                        fromAccount = result.data.content?.firstOrNull()
-                    )
+                is NetworkResult.Success -> {
+                    val all = result.data.content ?: emptyList()
+                    val filtered = if (state.value.fromIps) {
+                        val rsd = all.filter { (it.currency ?: "").equals("RSD", ignoreCase = true) }
+                        val tekuci = rsd.filter { acc ->
+                            val combined = "${acc.tip ?: ""} ${acc.accountType ?: ""} ${acc.accountCategory ?: ""}"
+                            combined.contains("TEKUCI", ignoreCase = true) || combined.contains("CURRENT", ignoreCase = true)
+                        }
+                        when {
+                            tekuci.isNotEmpty() -> tekuci
+                            rsd.isNotEmpty() -> rsd
+                            else -> all
+                        }
+                    } else {
+                        all
+                    }
+                    setState {
+                        copy(
+                            isLoading = false,
+                            accounts = filtered,
+                            fromAccount = filtered.firstOrNull()
+                        )
+                    }
                 }
                 is NetworkResult.Error -> setState { copy(isLoading = false, error = result.toErrorData()) }
                 is NetworkResult.Exception -> setState { copy(isLoading = false, error = result.toErrorData()) }
@@ -219,6 +299,7 @@ interface PaymentContract {
 
     data class UiState(
         val step: Step = Step.FORM,
+        val fromIps: Boolean = false,
         val accounts: List<AccountDetailsResponseDto> = emptyList(),
         val fromAccount: AccountDetailsResponseDto? = null,
         val toAccountNumber: String = "",
@@ -247,6 +328,7 @@ interface PaymentContract {
         data object ClearError : UiEvent
         data object OpenVerificationCodes : UiEvent
         data object DismissResult : UiEvent
+        data class IpsQrScanned(val rawString: String) : UiEvent
     }
 
     sealed interface SideEffect {

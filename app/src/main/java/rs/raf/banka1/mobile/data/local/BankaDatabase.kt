@@ -4,11 +4,12 @@ import androidx.room.Database
 import androidx.room.RoomDatabase
 
 @Database(
-    entities = [VerificationCodeEntity::class, ExchangeRateEntity::class],
-    version = 2,
+    entities = [VerificationCodeEntity::class, ExchangeRateEntity::class, IpsQrCodeEntity::class],
+    version = 4,
     exportSchema = false
 )
 abstract class BankaDatabase : RoomDatabase() {
     abstract fun verificationCodeDao(): VerificationCodeDao
     abstract fun exchangeRateDao(): ExchangeRateDao
+    abstract fun ipsQrCodeDao(): IpsQrCodeDao
 }

@@ -38,7 +38,10 @@ object Routes {
         data object Transfers : MainFlow
 
         @Serializable
-        data object Payments : MainFlow
+        data class Payments(val ipsPayload: String? = null) : MainFlow
+
+        @Serializable
+        data object IpsHub : MainFlow
 
         @Serializable
         data object History : MainFlow

@@ -1,6 +1,7 @@
 package rs.raf.banka1.mobile.presentation.screens.payments
 
 import androidx.activity.compose.BackHandler
+import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -44,6 +45,7 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -57,7 +59,12 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import io.github.g00fy2.quickie.QRResult
+import io.github.g00fy2.quickie.ScanCustomCode
+import io.github.g00fy2.quickie.config.BarcodeFormat
+import io.github.g00fy2.quickie.config.ScannerConfig
 import rs.raf.banka1.mobile.data.remote.responses.AccountDetailsResponseDto
+import rs.raf.banka1.mobile.presentation.navigation.LocalTopBarScanAction
 import rs.raf.banka1.mobile.data.remote.responses.NewPaymentResponseDto
 import rs.raf.banka1.mobile.presentation.components.ErrorData
 import rs.raf.banka1.mobile.presentation.components.ErrorDialog
@@ -77,6 +84,26 @@ fun PaymentScreen(
 
     BackHandler(enabled = state.step == PaymentContract.Step.OTP) {
         viewModel.setEvent(PaymentContract.UiEvent.BackToForm)
+    }
+
+    val scanLauncher = rememberLauncherForActivityResult(ScanCustomCode()) { result ->
+        if (result is QRResult.QRSuccess) {
+            result.content.rawValue?.let {
+                viewModel.setEvent(PaymentContract.UiEvent.IpsQrScanned(it))
+            }
+        }
+    }
+
+    val topBarScanAction = LocalTopBarScanAction.current
+    DisposableEffect(scanLauncher, state.step) {
+        topBarScanAction.value = if (state.step == PaymentContract.Step.FORM) {
+            {
+                scanLauncher.launch(
+                    ScannerConfig.build { setBarcodeFormats(listOf(BarcodeFormat.FORMAT_QR_CODE)) }
+                )
+            }
+        } else null
+        onDispose { topBarScanAction.value = null }
     }
 
     LaunchedEffect(Unit) {

@@ -1,10 +1,12 @@
 package rs.raf.banka1.mobile.presentation.navigation
 
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Menu
+import androidx.compose.material.icons.filled.QrCodeScanner
 import androidx.compose.material3.DrawerValue
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -22,15 +24,21 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.MutableFloatState
+import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.currentBackStackEntryAsState
@@ -51,6 +59,14 @@ import rs.raf.banka1.mobile.presentation.components.SideMenuState
  */
 val LocalDashboardTopBarProgress = compositionLocalOf<MutableFloatState> {
     error("LocalDashboardTopBarProgress not provided")
+}
+
+/**
+ * Lets a screen register a "scan IPS QR" action that the top app bar surfaces as an
+ * icon. The screen sets this in a DisposableEffect and clears it on dispose.
+ */
+val LocalTopBarScanAction = compositionLocalOf<MutableState<(() -> Unit)?>> {
+    error("LocalTopBarScanAction not provided")
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -92,7 +108,9 @@ fun RootNavGraph(
                     currentRoute.contains(
                         item.route::class.qualifiedName?.substringBefore("$") ?: ""
                     )
-                }
+                } || currentRoute.contains(
+                    Routes.MainFlow::class.qualifiedName ?: ""
+                )
             }
         }
     }
@@ -120,6 +138,7 @@ fun RootNavGraph(
     }.collectAsState(initial = SideMenuState.Loading)
 
     val dashboardScrollProgress = remember { mutableFloatStateOf(0f) }
+    val topBarScanAction = remember { mutableStateOf<(() -> Unit)?>(null) }
     val clientFullName = (sideMenuState as? SideMenuState.Content)
         ?.let { "${it.clientData.name} ${it.clientData.lastName}".trim() }
         ?.takeIf { it.isNotBlank() }
@@ -181,6 +200,15 @@ fun RootNavGraph(
                                 Icon(Icons.Default.Menu, contentDescription = "Meni")
                             }
                         },
+                        actions = {
+                            val onScan = topBarScanAction.value
+                            when {
+                                isOnDashboard -> IpsTopBarAction(
+                                    onClick = { navController.navigate(Routes.MainFlow.IpsHub) }
+                                )
+                                onScan != null -> IpsTopBarAction(onClick = onScan)
+                            }
+                        },
                         colors = TopAppBarDefaults.topAppBarColors(
                             containerColor = MaterialTheme.colorScheme.primaryContainer,
                             titleContentColor = MaterialTheme.colorScheme.onPrimaryContainer,
@@ -195,7 +223,8 @@ fun RootNavGraph(
                         .padding(padding)
                 ) {
                     CompositionLocalProvider(
-                        LocalDashboardTopBarProgress provides dashboardScrollProgress
+                        LocalDashboardTopBarProgress provides dashboardScrollProgress,
+                        LocalTopBarScanAction provides topBarScanAction
                     ) {
                         NavHost(
                             navController = navController,
@@ -215,6 +244,25 @@ fun RootNavGraph(
         ) {
             authNavGraph(navController)
             mainNavGraph(navController)
+        }
+    }
+}
+
+@Composable
+private fun IpsTopBarAction(onClick: () -> Unit) {
+    IconButton(onClick = onClick) {
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Icon(
+                imageVector = Icons.Default.QrCodeScanner,
+                contentDescription = "IPS placanja",
+                tint = MaterialTheme.colorScheme.onPrimaryContainer
+            )
+            Text(
+                text = "IPS",
+                fontSize = 9.sp,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onPrimaryContainer
+            )
         }
     }
 }

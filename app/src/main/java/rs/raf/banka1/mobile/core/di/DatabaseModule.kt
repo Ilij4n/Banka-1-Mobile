@@ -9,6 +9,7 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
 import rs.raf.banka1.mobile.data.local.BankaDatabase
 import rs.raf.banka1.mobile.data.local.ExchangeRateDao
+import rs.raf.banka1.mobile.data.local.IpsQrCodeDao
 import rs.raf.banka1.mobile.data.local.VerificationCodeDao
 import javax.inject.Singleton
 
@@ -36,5 +37,11 @@ object DatabaseModule {
     @Provides
     fun provideExchangeRateDao(database: BankaDatabase): ExchangeRateDao {
         return database.exchangeRateDao()
+    }
+
+    @Singleton
+    @Provides
+    fun provideIpsQrCodeDao(database: BankaDatabase): IpsQrCodeDao {
+        return database.ipsQrCodeDao()
     }
 }
