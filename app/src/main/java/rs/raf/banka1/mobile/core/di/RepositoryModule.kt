@@ -5,7 +5,9 @@ import dagger.Module
 import dagger.hilt.InstallIn
 import dagger.hilt.components.SingletonComponent
 import rs.raf.banka1.mobile.data.repository.AuthRepositoryImpl
+import rs.raf.banka1.mobile.data.repository.IpsRepositoryImpl
 import rs.raf.banka1.mobile.domain.repository.AuthRepository
+import rs.raf.banka1.mobile.domain.repository.IpsRepository
 import javax.inject.Singleton
 
 @Module
@@ -15,4 +17,8 @@ abstract class RepositoryModule {
     @Binds
     @Singleton
     abstract fun bindsAuthRepository(impl: AuthRepositoryImpl): AuthRepository
+
+    @Binds
+    @Singleton
+    abstract fun bindsIpsRepository(impl: IpsRepositoryImpl): IpsRepository
 }

@@ -23,7 +23,7 @@ interface TransactionApi {
         @Query("size") size: Int = 10
     ): NetworkResult<PageResponse<TransactionResponseDto>>
 
-    @GET("transactions/")
+    @GET("transactions")
     suspend fun getTransactions(
         @Query("clientId") clientId: Long,
         @Query("page") page: Int = 0,

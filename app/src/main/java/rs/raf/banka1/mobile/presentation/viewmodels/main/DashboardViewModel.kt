@@ -31,8 +31,6 @@ class DashboardViewModel @Inject constructor(
 ) {
 
     init {
-        loadData()
-
         verificationCodeDao.observeActiveCount(System.currentTimeMillis())
             .onEach { count -> setState { copy(activeVerificationCount = count) } }
             .launchIn(viewModelScope)

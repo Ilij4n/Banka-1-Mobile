@@ -132,6 +132,10 @@ fun DashboardScreen(
         }
     }
 
+    LaunchedEffect(Unit) {
+        onEvent(DashboardContract.UiEvent.Refresh)
+    }
+
     val scrollState = rememberScrollState()
     val topBarProgress = LocalDashboardTopBarProgress.current
     var greetingHeightPx by remember { mutableIntStateOf(0) }

@@ -121,4 +121,8 @@ dependencies {
     implementation(libs.room.runtime)
     implementation(libs.room.ktx)
     ksp(libs.room.compiler)
+
+    // QR Code
+    implementation(libs.quickie.bundled)
+    implementation(libs.zxing.core)
 }

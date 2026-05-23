@@ -260,7 +260,7 @@ private fun InnerInputField(
             cursorColor = MaterialTheme.colorScheme.primary,
             // M3 nicely handles label colors automatically based on focus/error state
         ),
-        modifier = modifier.fillMaxWidth(), // Applied outer modifier here
+        modifier = modifier.fillMaxWidth().then(innerModifier),
         isError = dirty && (requiredError || error != null),
         label = {
             if (label != null) {

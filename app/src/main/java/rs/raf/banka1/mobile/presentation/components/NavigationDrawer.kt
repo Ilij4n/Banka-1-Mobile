@@ -22,6 +22,7 @@ import androidx.compose.material.icons.filled.CurrencyExchange
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Payment
 import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.QrCode
 import androidx.compose.material.icons.filled.Receipt
 import androidx.compose.material.icons.filled.SwapHoriz
 import androidx.compose.material.icons.filled.VerifiedUser
@@ -61,6 +62,8 @@ enum class DrawerMenuItem(
 ) {
     DASHBOARD(Icons.Default.Home, "Pocetna", Routes.MainFlow.Dashboard),
     ACCOUNTS(Icons.Default.AccountBalance, "Racuni i kartice", Routes.MainFlow.Accounts),
+    PAYMENTS(Icons.Default.Payment, "Placanja", Routes.MainFlow.Payments()),
+    IPS_PAYMENTS(Icons.Default.QrCode, "IPS Plaćanja", Routes.MainFlow.IpsHub),
     HISTORY(Icons.Default.Receipt, "Istorija", Routes.MainFlow.History),
     EXCHANGE(Icons.Default.CurrencyExchange, "Menjacnica", Routes.MainFlow.Exchange),
     VERIFICATION(Icons.Default.VerifiedUser, "Verifikacija", Routes.MainFlow.Verification),

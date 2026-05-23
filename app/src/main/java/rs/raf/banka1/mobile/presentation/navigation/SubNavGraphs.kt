@@ -22,6 +22,8 @@ import rs.raf.banka1.mobile.presentation.screens.history.HistoryScreen
 import rs.raf.banka1.mobile.presentation.screens.history.TransactionDetailScreen
 import rs.raf.banka1.mobile.presentation.screens.history.TransferDetailScreen
 import rs.raf.banka1.mobile.presentation.screens.main.VerificationScreen
+import rs.raf.banka1.mobile.presentation.screens.ips.IpsHubScreen
+import rs.raf.banka1.mobile.presentation.screens.payments.PaymentScreen
 import rs.raf.banka1.mobile.presentation.screens.profile.ProfileScreen
 
 fun NavGraphBuilder.authNavGraph(navController: NavController) {
@@ -138,7 +140,27 @@ fun NavGraphBuilder.mainNavGraph(navController: NavController) {
         }
 
         composable<Routes.MainFlow.Payments> {
-            // TODO: PaymentScreen
+            PaymentScreen(
+                viewModel = hiltViewModel(),
+                onNavigateBack = { navController.popBackStack() },
+                onNavigateToVerification = {
+                    navController.navigate(Routes.MainFlow.Verification) {
+                        launchSingleTop = true
+                    }
+                }
+            )
+        }
+
+        composable<Routes.MainFlow.IpsHub> {
+            IpsHubScreen(
+                viewModel = hiltViewModel(),
+                onNavigateToPaymentWithIps = { encodedPayload ->
+                    navController.navigate(Routes.MainFlow.Payments(ipsPayload = encodedPayload)) {
+                        launchSingleTop = true
+                    }
+                },
+                onNavigateBack = { navController.popBackStack() }
+            )
         }
 
         composable<Routes.MainFlow.History> {
