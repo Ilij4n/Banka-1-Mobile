@@ -20,9 +20,11 @@ import androidx.compose.material.icons.filled.AccountBalance
 import androidx.compose.material.icons.filled.AccountCircle
 import androidx.compose.material.icons.filled.CurrencyExchange
 import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Payment
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.QrCode
+import androidx.compose.material.icons.automirrored.filled.ShowChart
 import androidx.compose.material.icons.filled.Receipt
 import androidx.compose.material.icons.filled.SwapHoriz
 import androidx.compose.material.icons.filled.VerifiedUser
@@ -65,6 +67,8 @@ enum class DrawerMenuItem(
     PAYMENTS(Icons.Default.Payment, "Placanja", Routes.MainFlow.Payments()),
     IPS_PAYMENTS(Icons.Default.QrCode, "IPS Plaćanja", Routes.MainFlow.IpsHub),
     HISTORY(Icons.Default.Receipt, "Istorija", Routes.MainFlow.History),
+    MY_ORDERS(Icons.AutoMirrored.Filled.ShowChart, "Moji nalozi", Routes.MainFlow.MyOrders),
+    NOTIFICATIONS(Icons.Default.Notifications, "Obavestenja", Routes.MainFlow.Notifications),
     EXCHANGE(Icons.Default.CurrencyExchange, "Menjacnica", Routes.MainFlow.Exchange),
     VERIFICATION(Icons.Default.VerifiedUser, "Verifikacija", Routes.MainFlow.Verification),
     PROFILE(Icons.Default.Person, "Profil", Routes.MainFlow.Profile);

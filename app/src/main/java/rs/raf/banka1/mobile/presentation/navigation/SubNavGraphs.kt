@@ -23,6 +23,8 @@ import rs.raf.banka1.mobile.presentation.screens.history.TransactionDetailScreen
 import rs.raf.banka1.mobile.presentation.screens.history.TransferDetailScreen
 import rs.raf.banka1.mobile.presentation.screens.main.VerificationScreen
 import rs.raf.banka1.mobile.presentation.screens.ips.IpsHubScreen
+import rs.raf.banka1.mobile.presentation.screens.notifications.NotificationsScreen
+import rs.raf.banka1.mobile.presentation.screens.orders.MyOrdersScreen
 import rs.raf.banka1.mobile.presentation.screens.payments.PaymentScreen
 import rs.raf.banka1.mobile.presentation.screens.profile.ProfileScreen
 
@@ -202,6 +204,23 @@ fun NavGraphBuilder.mainNavGraph(navController: NavController) {
             TransactionDetailScreen(
                 viewModel = hiltViewModel(),
                 onNavigateBack = { navController.popBackStack() }
+            )
+        }
+
+        composable<Routes.MainFlow.MyOrders> {
+            MyOrdersScreen(
+                viewModel = hiltViewModel()
+            )
+        }
+
+        composable<Routes.MainFlow.Notifications> {
+            NotificationsScreen(
+                viewModel = hiltViewModel(),
+                onNavigateToOrders = {
+                    navController.navigate(Routes.MainFlow.MyOrders) {
+                        launchSingleTop = true
+                    }
+                }
             )
         }
 
