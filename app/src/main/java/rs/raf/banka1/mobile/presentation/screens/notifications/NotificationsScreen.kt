@@ -23,10 +23,12 @@ import androidx.compose.material.icons.automirrored.filled.ReceiptLong
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.DoneAll
 import androidx.compose.material.icons.filled.Notifications
+import androidx.compose.material.icons.filled.NotificationsActive
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -51,7 +53,8 @@ import java.util.Locale
 @Composable
 fun NotificationsScreen(
     viewModel: NotificationsViewModel,
-    onNavigateToOrders: () -> Unit
+    onNavigateToOrders: () -> Unit,
+    onNavigateToPriceAlerts: () -> Unit
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val onEvent = viewModel::setEvent
@@ -80,6 +83,14 @@ fun NotificationsScreen(
                 color = MaterialTheme.colorScheme.onBackground,
                 modifier = Modifier.weight(1f)
             )
+            IconButton(onClick = onNavigateToPriceAlerts) {
+                Icon(
+                    imageVector = Icons.Default.NotificationsActive,
+                    contentDescription = "Cenovni alarmi",
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(22.dp)
+                )
+            }
             if (state.notifications.any { !it.isRead }) {
                 TextButton(onClick = { onEvent(NotificationsContract.UiEvent.MarkAllRead) }) {
                     Icon(

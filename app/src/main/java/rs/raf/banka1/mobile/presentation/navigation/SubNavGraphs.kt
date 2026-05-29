@@ -25,6 +25,7 @@ import rs.raf.banka1.mobile.presentation.screens.main.VerificationScreen
 import rs.raf.banka1.mobile.presentation.screens.ips.IpsHubScreen
 import rs.raf.banka1.mobile.presentation.screens.notifications.NotificationsScreen
 import rs.raf.banka1.mobile.presentation.screens.orders.MyOrdersScreen
+import rs.raf.banka1.mobile.presentation.screens.pricealerts.PriceAlertsScreen
 import rs.raf.banka1.mobile.presentation.screens.payments.PaymentScreen
 import rs.raf.banka1.mobile.presentation.screens.profile.ProfileScreen
 
@@ -220,7 +221,19 @@ fun NavGraphBuilder.mainNavGraph(navController: NavController) {
                     navController.navigate(Routes.MainFlow.MyOrders) {
                         launchSingleTop = true
                     }
+                },
+                onNavigateToPriceAlerts = {
+                    navController.navigate(Routes.MainFlow.PriceAlerts) {
+                        launchSingleTop = true
+                    }
                 }
+            )
+        }
+
+        composable<Routes.MainFlow.PriceAlerts> {
+            PriceAlertsScreen(
+                viewModel = hiltViewModel(),
+                onNavigateBack = { navController.popBackStack() }
             )
         }
 
