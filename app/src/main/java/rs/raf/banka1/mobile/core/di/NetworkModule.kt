@@ -21,6 +21,7 @@ import rs.raf.banka1.mobile.data.apis.AuthApi
 import rs.raf.banka1.mobile.data.apis.CardApi
 import rs.raf.banka1.mobile.data.apis.ClientApi
 import rs.raf.banka1.mobile.data.apis.ExchangeApi
+import rs.raf.banka1.mobile.data.apis.OrderApi
 import rs.raf.banka1.mobile.data.apis.TransactionApi
 import rs.raf.banka1.mobile.data.apis.TransferApi
 import rs.raf.banka1.mobile.data.apis.NotificationApi
@@ -135,5 +136,11 @@ object NetworkModule {
     @Provides
     fun provideNotificationApi(retrofit: Retrofit): NotificationApi {
         return retrofit.create(NotificationApi::class.java)
+    }
+
+    @Singleton
+    @Provides
+    fun provideOrderApi(retrofit: Retrofit): OrderApi {
+        return retrofit.create(OrderApi::class.java)
     }
 }

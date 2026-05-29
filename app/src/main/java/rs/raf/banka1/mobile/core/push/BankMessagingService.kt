@@ -20,6 +20,8 @@ import rs.raf.banka1.mobile.MainActivity
 import rs.raf.banka1.mobile.R
 import rs.raf.banka1.mobile.core.di.ApplicationScope
 import rs.raf.banka1.mobile.data.apis.NotificationApi
+import rs.raf.banka1.mobile.data.local.NotificationDao
+import rs.raf.banka1.mobile.data.local.NotificationEntity
 import rs.raf.banka1.mobile.data.local.VerificationCodeDao
 import rs.raf.banka1.mobile.data.local.VerificationCodeEntity
 import rs.raf.banka1.mobile.data.remote.requests.FcmTokenRequest
@@ -39,6 +41,9 @@ class BankMessagingService : FirebaseMessagingService() {
     lateinit var verificationCodeDao: VerificationCodeDao
 
     @Inject
+    lateinit var notificationDao: NotificationDao
+
+    @Inject
     @ApplicationScope
     lateinit var appScope: CoroutineScope
 
@@ -46,8 +51,11 @@ class BankMessagingService : FirebaseMessagingService() {
         private const val TAG = "BankMessagingService"
         private const val CHANNEL_ID = "verification_codes"
         private const val CHANNEL_NAME = "Verifikacioni kodovi"
+        private const val ORDER_CHANNEL_ID = "order_notifications"
+        private const val ORDER_CHANNEL_NAME = "Obavestenja o nalozima"
         private const val OTP_VALIDITY_MILLIS = 5 * 60 * 1000L // 5 minutes
         private const val NOTIFICATION_ID = 1001
+        private const val ORDER_NOTIFICATION_ID = 1002
     }
 
     override fun onNewToken(token: String) {
@@ -66,8 +74,14 @@ class BankMessagingService : FirebaseMessagingService() {
         Log.d(TAG, "FCM message received: $data")
 
         val type = data["type"]
-        if (type != "VERIFICATION_OTP") return
+        when {
+            type == "VERIFICATION_OTP" -> handleVerificationOtp(data)
+            type?.startsWith("ORDER_") == true -> handleOrderNotification(type, data)
+            else -> return
+        }
+    }
 
+    private fun handleVerificationOtp(data: Map<String, String>) {
         val code = data["code"] ?: return
         val operationType = data["operationType"] ?: "UNKNOWN"
         val sessionId = data["sessionId"] ?: ""
@@ -93,6 +107,31 @@ class BankMessagingService : FirebaseMessagingService() {
         }
     }
 
+    private fun handleOrderNotification(type: String, data: Map<String, String>) {
+        val title = data["title"]?.takeIf { it.isNotBlank() } ?: "Obavestenje o nalogu"
+        val body = data["body"]?.takeIf { it.isNotBlank() }
+            ?: ("Status naloga: " + (data["status"] ?: ""))
+        val orderId = data["orderId"]?.toLongOrNull()
+        val now = System.currentTimeMillis()
+
+        appScope.launch {
+            notificationDao.insert(
+                NotificationEntity(
+                    type = type,
+                    title = title,
+                    body = body,
+                    orderId = orderId,
+                    receivedAt = now
+                )
+            )
+
+            val isLoggedIn = userPreferencesRepository.readClientData().firstOrNull() != null
+            if (isLoggedIn) {
+                showOrderNotification(title, body)
+            }
+        }
+    }
+
     private suspend fun registerTokenWithBackend(token: String) {
         try {
             val clientData = userPreferencesRepository.readClientData().firstOrNull()
@@ -100,7 +139,7 @@ class BankMessagingService : FirebaseMessagingService() {
                 notificationApi.registerFcmToken(
                     FcmTokenRequest(clientId = clientData.id, fcmToken = token)
                 )
-                Log.d(TAG, "FCM token registered with backend for clientId=${clientData.id}")
+                Log.d(TAG, "FCM token registered with backend for clientId=${clientData.id}. The token value is: $token")
             } else {
                 Log.d(TAG, "No client data yet, token saved locally for post-login sync")
             }
@@ -161,5 +200,50 @@ class BankMessagingService : FirebaseMessagingService() {
             .build()
 
         notificationManager.notify(NOTIFICATION_ID, notification)
+    }
+
+    private fun showOrderNotification(title: String, body: String) {
+        val notificationManager = getSystemService(NOTIFICATION_SERVICE) as NotificationManager
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val channel = NotificationChannel(
+                ORDER_CHANNEL_ID,
+                ORDER_CHANNEL_NAME,
+                NotificationManager.IMPORTANCE_HIGH
+            ).apply {
+                description = "Obavestenja o statusu vasih naloga"
+            }
+            notificationManager.createNotificationChannel(channel)
+        }
+
+        val intent = Intent(this, MainActivity::class.java).apply {
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+            putExtra("navigate_to", "notifications")
+        }
+
+        val pendingIntent = PendingIntent.getActivity(
+            this, 0, intent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+
+        val drawable = ContextCompat.getDrawable(this, R.mipmap.ic_launcher)
+        val largeIcon = Bitmap.createBitmap(128, 128, Bitmap.Config.ARGB_8888).also {
+            val canvas = Canvas(it)
+            drawable?.setBounds(0, 0, 128, 128)
+            drawable?.draw(canvas)
+        }
+
+        val notification = NotificationCompat.Builder(this, ORDER_CHANNEL_ID)
+            .setSmallIcon(R.drawable.ic_notification)
+            .setLargeIcon(largeIcon)
+            .setContentTitle(title)
+            .setContentText(body)
+            .setStyle(NotificationCompat.BigTextStyle().bigText(body))
+            .setPriority(NotificationCompat.PRIORITY_HIGH)
+            .setAutoCancel(true)
+            .setContentIntent(pendingIntent)
+            .build()
+
+        notificationManager.notify(ORDER_NOTIFICATION_ID, notification)
     }
 }

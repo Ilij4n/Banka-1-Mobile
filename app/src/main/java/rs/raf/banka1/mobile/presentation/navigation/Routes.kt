@@ -47,6 +47,12 @@ object Routes {
         data object History : MainFlow
 
         @Serializable
+        data object MyOrders : MainFlow
+
+        @Serializable
+        data object Notifications : MainFlow
+
+        @Serializable
         data class TransferDetail(
             val orderNumber: String,
             val fromCurrency: String,

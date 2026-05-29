@@ -76,9 +76,14 @@ class MainActivity : ComponentActivity() {
                             // Handle FCM notification tap
                             LaunchedEffect(intent) {
                                 val navigateTo = intent?.getStringExtra("navigate_to")
-                                if (navigateTo == "verification" && state.destination is Routes.MainGraph) {
-                                    navController.navigate(Routes.MainFlow.Verification) {
-                                        launchSingleTop = true
+                                if (state.destination is Routes.MainGraph) {
+                                    when (navigateTo) {
+                                        "verification" -> navController.navigate(Routes.MainFlow.Verification) {
+                                            launchSingleTop = true
+                                        }
+                                        "notifications" -> navController.navigate(Routes.MainFlow.Notifications) {
+                                            launchSingleTop = true
+                                        }
                                     }
                                 }
                             }
