@@ -53,9 +53,12 @@ class BankMessagingService : FirebaseMessagingService() {
         private const val CHANNEL_NAME = "Verifikacioni kodovi"
         private const val ORDER_CHANNEL_ID = "order_notifications"
         private const val ORDER_CHANNEL_NAME = "Obavestenja o nalozima"
+        private const val PRICE_ALERT_CHANNEL_ID = "price_alerts"
+        private const val PRICE_ALERT_CHANNEL_NAME = "Cenovni alarmi"
         private const val OTP_VALIDITY_MILLIS = 5 * 60 * 1000L // 5 minutes
         private const val NOTIFICATION_ID = 1001
         private const val ORDER_NOTIFICATION_ID = 1002
+        private const val PRICE_ALERT_NOTIFICATION_ID = 1003
     }
 
     override fun onNewToken(token: String) {
@@ -77,6 +80,7 @@ class BankMessagingService : FirebaseMessagingService() {
         when {
             type == "VERIFICATION_OTP" -> handleVerificationOtp(data)
             type?.startsWith("ORDER_") == true -> handleOrderNotification(type, data)
+            type == "PRICE_ALERT_TRIGGERED" -> handlePriceAlertNotification(data)
             else -> return
         }
     }
@@ -128,6 +132,30 @@ class BankMessagingService : FirebaseMessagingService() {
             val isLoggedIn = userPreferencesRepository.readClientData().firstOrNull() != null
             if (isLoggedIn) {
                 showOrderNotification(title, body)
+            }
+        }
+    }
+
+    private fun handlePriceAlertNotification(data: Map<String, String>) {
+        val title = data["title"]?.takeIf { it.isNotBlank() } ?: "Cenovni alarm aktiviran"
+        val body = data["body"]?.takeIf { it.isNotBlank() }
+            ?: ("Ticker: " + (data["ticker"] ?: ""))
+        val now = System.currentTimeMillis()
+
+        appScope.launch {
+            notificationDao.insert(
+                NotificationEntity(
+                    type = "PRICE_ALERT_TRIGGERED",
+                    title = title,
+                    body = body,
+                    orderId = null,
+                    receivedAt = now
+                )
+            )
+
+            val isLoggedIn = userPreferencesRepository.readClientData().firstOrNull() != null
+            if (isLoggedIn) {
+                showPriceAlertNotification(title, body)
             }
         }
     }
@@ -245,5 +273,50 @@ class BankMessagingService : FirebaseMessagingService() {
             .build()
 
         notificationManager.notify(ORDER_NOTIFICATION_ID, notification)
+    }
+
+    private fun showPriceAlertNotification(title: String, body: String) {
+        val notificationManager = getSystemService(NOTIFICATION_SERVICE) as NotificationManager
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val channel = NotificationChannel(
+                PRICE_ALERT_CHANNEL_ID,
+                PRICE_ALERT_CHANNEL_NAME,
+                NotificationManager.IMPORTANCE_HIGH
+            ).apply {
+                description = "Obavestenja kada cena dostigne vas alarm"
+            }
+            notificationManager.createNotificationChannel(channel)
+        }
+
+        val intent = Intent(this, MainActivity::class.java).apply {
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+            putExtra("navigate_to", "notifications")
+        }
+
+        val pendingIntent = PendingIntent.getActivity(
+            this, 0, intent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+
+        val drawable = ContextCompat.getDrawable(this, R.mipmap.ic_launcher)
+        val largeIcon = Bitmap.createBitmap(128, 128, Bitmap.Config.ARGB_8888).also {
+            val canvas = Canvas(it)
+            drawable?.setBounds(0, 0, 128, 128)
+            drawable?.draw(canvas)
+        }
+
+        val notification = NotificationCompat.Builder(this, PRICE_ALERT_CHANNEL_ID)
+            .setSmallIcon(R.drawable.ic_notification)
+            .setLargeIcon(largeIcon)
+            .setContentTitle(title)
+            .setContentText(body)
+            .setStyle(NotificationCompat.BigTextStyle().bigText(body))
+            .setPriority(NotificationCompat.PRIORITY_HIGH)
+            .setAutoCancel(true)
+            .setContentIntent(pendingIntent)
+            .build()
+
+        notificationManager.notify(PRICE_ALERT_NOTIFICATION_ID, notification)
     }
 }
