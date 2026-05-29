@@ -112,9 +112,14 @@ class BankMessagingService : FirebaseMessagingService() {
     }
 
     private fun handleOrderNotification(type: String, data: Map<String, String>) {
-        val title = data["title"]?.takeIf { it.isNotBlank() } ?: "Obavestenje o nalogu"
-        val body = data["body"]?.takeIf { it.isNotBlank() }
-            ?: ("Status naloga: " + (data["status"] ?: ""))
+        val title = data["title"]?.takeIf { it.isNotBlank() } ?: when (type) {
+            "ORDER_RECURRING_SKIPPED" -> "Periodicni nalog preskocen"
+            else -> "Obavestenje o nalogu"
+        }
+        val body = data["body"]?.takeIf { it.isNotBlank() } ?: when (type) {
+            "ORDER_RECURRING_SKIPPED" -> "Vas periodicni nalog nije izvrsen zbog nedovoljnih sredstava."
+            else -> "Status naloga: " + (data["status"] ?: "")
+        }
         val orderId = data["orderId"]?.toLongOrNull()
         val now = System.currentTimeMillis()
 

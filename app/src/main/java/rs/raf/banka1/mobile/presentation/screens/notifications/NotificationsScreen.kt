@@ -20,6 +20,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ReceiptLong
+import androidx.compose.material.icons.filled.Autorenew
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.DoneAll
 import androidx.compose.material.icons.filled.Notifications
@@ -189,8 +190,13 @@ private fun NotificationCard(
                     .background(accent.copy(alpha = 0.12f)),
                 contentAlignment = Alignment.Center
             ) {
+                val icon = when {
+                    notification.type == "ORDER_RECURRING_SKIPPED" -> Icons.Default.Autorenew
+                    notification.isRead -> Icons.Default.CheckCircle
+                    else -> Icons.Default.Notifications
+                }
                 Icon(
-                    imageVector = if (notification.isRead) Icons.Default.CheckCircle else Icons.Default.Notifications,
+                    imageVector = icon,
                     contentDescription = null,
                     tint = accent,
                     modifier = Modifier.size(22.dp)
