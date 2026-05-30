@@ -23,8 +23,12 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.AccountBalance
+import androidx.compose.material.icons.filled.Block
 import androidx.compose.material.icons.filled.CreditCard
 import androidx.compose.material.icons.filled.Info
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -34,6 +38,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
@@ -71,6 +76,40 @@ fun CardDetailScreen(
         ErrorDialog(errorData = state.error) {
             viewModel.setEvent(CardDetailContract.UiEvent.ClearError)
         }
+    }
+
+    if (state.showBlockDialog) {
+        AlertDialog(
+            onDismissRequest = { viewModel.setEvent(CardDetailContract.UiEvent.DismissBlockDialog) },
+            title = { Text("Blokiraj karticu") },
+            text = {
+                Text("Da li ste sigurni da želite da blokirate ovu karticu? Odblokiranje je moguće samo lično u ekspozituri ili pozivom korisničkoj podršci.")
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = { viewModel.setEvent(CardDetailContract.UiEvent.BlockCard) },
+                    enabled = !state.isBlocking
+                ) {
+                    if (state.isBlocking) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(18.dp),
+                            strokeWidth = 2.dp,
+                            color = MaterialTheme.colorScheme.error
+                        )
+                    } else {
+                        Text("Blokiraj", color = MaterialTheme.colorScheme.error)
+                    }
+                }
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = { viewModel.setEvent(CardDetailContract.UiEvent.DismissBlockDialog) },
+                    enabled = !state.isBlocking
+                ) {
+                    Text("Otkaži")
+                }
+            }
+        )
     }
 
     Scaffold(
@@ -112,7 +151,8 @@ fun CardDetailScreen(
             } else if (state.card != null) {
                 CardDetailContent(
                     card = state.card!!,
-                    account = state.account
+                    account = state.account,
+                    onBlockClick = { viewModel.setEvent(CardDetailContract.UiEvent.ShowBlockDialog) }
                 )
             }
         }
@@ -122,7 +162,8 @@ fun CardDetailScreen(
 @Composable
 private fun CardDetailContent(
     card: CardResponseDto,
-    account: AccountDetailsResponseDto?
+    account: AccountDetailsResponseDto?,
+    onBlockClick: () -> Unit
 ) {
     val animProgress = remember { Animatable(0f) }
     LaunchedEffect(Unit) {
@@ -193,7 +234,64 @@ private fun CardDetailContent(
                 }
             }
 
+            // Block action section
+            CardBlockSection(card = card, onBlockClick = onBlockClick)
+
             Spacer(modifier = Modifier.height(24.dp))
+        }
+    }
+}
+
+@Composable
+private fun CardBlockSection(
+    card: CardResponseDto,
+    onBlockClick: () -> Unit
+) {
+    val status = card.status ?: ""
+    val isActive = status == "ACTIVE" || status == "ACTIVATED"
+    val isBlocked = status == "BLOCKED"
+
+    if (!isActive && !isBlocked) return
+
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        if (isActive) {
+            Button(
+                onClick = onBlockClick,
+                modifier = Modifier.fillMaxWidth(),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = MaterialTheme.colorScheme.error
+                )
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Block,
+                    contentDescription = null,
+                    modifier = Modifier.size(18.dp)
+                )
+                Spacer(Modifier.width(8.dp))
+                Text("Blokiraj karticu")
+            }
+        }
+
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(8.dp))
+                .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f))
+                .padding(12.dp),
+            verticalAlignment = Alignment.Top
+        ) {
+            Icon(
+                imageVector = Icons.Default.Info,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.size(16.dp)
+            )
+            Spacer(Modifier.width(8.dp))
+            Text(
+                text = "Odblokiranje je moguće samo lično u ekspozituri ili pozivom korisničkoj podršci.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
         }
     }
 }
