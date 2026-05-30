@@ -105,6 +105,10 @@ fun AccountsCardsScreen(
     val state by viewModel.state.collectAsStateWithLifecycle()
     val onEvent = viewModel::setEvent
 
+    LaunchedEffect(Unit) {
+        viewModel.loadData()
+    }
+
     if (state.error != null) {
         ErrorDialog(errorData = state.error) {
             onEvent(AccountsCardsContract.UiEvent.ClearError)
@@ -545,17 +549,19 @@ private fun CardItem(
             }
 
             Column(horizontalAlignment = Alignment.End) {
-                Box(
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(6.dp))
-                        .background(statusColor.copy(alpha = 0.12f))
-                        .padding(horizontal = 8.dp, vertical = 4.dp)
-                ) {
-                    Text(
-                        text = cardStatusLabels[status] ?: status,
-                        style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.SemiBold),
-                        color = statusColor
-                    )
+                if (card.status != null) {
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(6.dp))
+                            .background(statusColor.copy(alpha = 0.12f))
+                            .padding(horizontal = 8.dp, vertical = 4.dp)
+                    ) {
+                        Text(
+                            text = cardStatusLabels[status] ?: status,
+                            style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.SemiBold),
+                            color = statusColor
+                        )
+                    }
                 }
 
                 if (card.expiryDate != null) {

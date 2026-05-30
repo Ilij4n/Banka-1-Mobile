@@ -2,6 +2,8 @@ package rs.raf.banka1.mobile.presentation.viewmodels.main
 
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.launch
 import rs.raf.banka1.mobile.data.apis.AccountApi
 import rs.raf.banka1.mobile.data.apis.CardApi
@@ -20,10 +22,6 @@ class AccountsCardsViewModel @Inject constructor(
     AccountsCardsContract.UiState()
 ) {
 
-    init {
-        loadData()
-    }
-
     override fun setEvent(event: AccountsCardsContract.UiEvent) {
         when (event) {
             is AccountsCardsContract.UiEvent.SelectTab -> setState { copy(selectedTab = event.tab) }
@@ -32,7 +30,7 @@ class AccountsCardsViewModel @Inject constructor(
         }
     }
 
-    private fun loadData() {
+    fun loadData() {
         viewModelScope.launch {
             setState { copy(isLoading = true, error = null) }
 
@@ -40,68 +38,57 @@ class AccountsCardsViewModel @Inject constructor(
                 is NetworkResult.Success -> {
                     val summaries = result.data.content
 
-                    // Fetch full account details (balance, embedded cards if backend provides them)
+                    // Fetch all account details in parallel
                     val accounts = summaries.map { summary ->
-                        val number = summary.brojRacuna ?: return@map summary
-                        when (val detail = accountApi.getAccountDetailsByNumber(number)) {
-                            is NetworkResult.Success -> detail.data
-                            else -> summary
+                        async {
+                            val number = summary.brojRacuna ?: return@async summary
+                            when (val detail = accountApi.getAccountDetailsByNumber(number)) {
+                                is NetworkResult.Success -> detail.data
+                                else -> summary
+                            }
                         }
-                    }
+                    }.awaitAll()
 
-                    // Index any cards the account-details endpoint already returned.
-                    // These carry the full CardResponseDto (id, status, cardType, expiryDate)
-                    // which is needed for the block feature.
-                    val detailedCardsByNumber: Map<String, CardResponseDto> = accounts
-                        .flatMap { it.cards ?: emptyList() }
-                        .filter { it.cardNumber != null }
-                        .associateBy { it.cardNumber!! }
-
-                    // Use CardApi as the definitive card list — it works even when the
-                    // account-details endpoint does not populate the cards field.
                     val clientId = accounts.firstOrNull()?.vlasnik
                     val cards: List<CardWithAccount> = if (clientId != null) {
-                        when (val cardResult = cardApi.getClientCards(clientId)) {
-                            is NetworkResult.Success -> cardResult.data.map { summary ->
-                                val account = accounts.find { it.brojRacuna == summary.accountNumber }
-                                // Prefer the enriched card from account-details (full info + id);
-                                // fall back to a minimal stub when account-details had no cards.
-                                val card = detailedCardsByNumber[summary.maskedCardNumber]
-                                    ?: CardResponseDto(
-                                        id = summary.id,
-                                        cardNumber = summary.maskedCardNumber,
-                                        accountNumber = summary.accountNumber
-                                    )
-                                CardWithAccount(
-                                    card = card,
-                                    accountName = account?.nazivRacuna
-                                        ?: account?.brojRacuna
-                                        ?: summary.accountNumber
-                                        ?: "",
-                                    accountId = clientId
-                                )
+                        when (val cardListResult = cardApi.getClientCards(clientId)) {
+                            is NetworkResult.Success -> {
+                                // Fetch full card details in parallel — gives us accurate status, type, expiry
+                                cardListResult.data.mapNotNull { summary ->
+                                    val id = summary.id ?: return@mapNotNull null
+                                    async {
+                                        val account = accounts.find { it.brojRacuna == summary.accountNumber }
+                                        val card = when (val r = cardApi.getCardById(id)) {
+                                            is NetworkResult.Success -> CardResponseDto(
+                                                id = r.data.id,
+                                                cardNumber = r.data.cardNumber,
+                                                cardType = r.data.cardType,
+                                                status = r.data.status,
+                                                expiryDate = r.data.expirationDate,
+                                                accountNumber = r.data.accountNumber
+                                            )
+                                            // If detail fetch fails, show card without status
+                                            else -> CardResponseDto(
+                                                id = summary.id,
+                                                cardNumber = summary.maskedCardNumber,
+                                                accountNumber = summary.accountNumber
+                                            )
+                                        }
+                                        CardWithAccount(
+                                            card = card,
+                                            accountName = account?.nazivRacuna
+                                                ?: account?.brojRacuna
+                                                ?: summary.accountNumber
+                                                ?: "",
+                                            accountId = clientId
+                                        )
+                                    }
+                                }.awaitAll()
                             }
-                            // CardApi failed — fall back to whatever account-details gave us
-                            else -> detailedCardsByNumber.values.map { card ->
-                                val account = accounts.find { it.brojRacuna == card.accountNumber }
-                                CardWithAccount(
-                                    card = card,
-                                    accountName = account?.nazivRacuna ?: account?.brojRacuna ?: "",
-                                    accountId = account?.vlasnik
-                                )
-                            }
+                            else -> emptyList()
                         }
                     } else {
-                        // No client ID available — use whatever account-details returned
-                        accounts.flatMap { account ->
-                            (account.cards ?: emptyList()).map { card ->
-                                CardWithAccount(
-                                    card = card,
-                                    accountName = account.nazivRacuna ?: account.brojRacuna ?: "",
-                                    accountId = account.vlasnik
-                                )
-                            }
-                        }
+                        emptyList()
                     }
 
                     setState { copy(isLoading = false, accounts = accounts, cards = cards) }
