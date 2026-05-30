@@ -100,7 +100,7 @@ private val currencySymbols = mapOf(
 fun AccountsCardsScreen(
     viewModel: AccountsCardsViewModel,
     onNavigateToAccountDetail: (String) -> Unit,
-    onNavigateToCardDetail: (String, String) -> Unit
+    onNavigateToCardDetail: (String, String, Long) -> Unit
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val onEvent = viewModel::setEvent
@@ -235,8 +235,8 @@ fun AccountsCardsScreen(
                     } else {
                         CardsList(
                             cards = state.cards,
-                            onCardClick = { accountNumber, cardNumber ->
-                                onNavigateToCardDetail(accountNumber, cardNumber)
+                            onCardClick = { accountNumber, cardNumber, cardId ->
+                                onNavigateToCardDetail(accountNumber, cardNumber, cardId)
                             }
                         )
                     }
@@ -415,7 +415,7 @@ private fun AccountCard(
 @Composable
 private fun CardsList(
     cards: List<CardWithAccount>,
-    onCardClick: (String, String) -> Unit
+    onCardClick: (String, String, Long) -> Unit
 ) {
     LazyColumn(
         contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
@@ -447,7 +447,8 @@ private fun CardsList(
                     onClick = {
                         onCardClick(
                             cardWithAccount.card.accountNumber ?: "",
-                            cardWithAccount.card.cardNumber ?: ""
+                            cardWithAccount.card.cardNumber ?: "",
+                            cardWithAccount.card.id ?: 0L
                         )
                     }
                 )

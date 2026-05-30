@@ -68,6 +68,7 @@ class AccountsCardsViewModel @Inject constructor(
                                 // fall back to a minimal stub when account-details had no cards.
                                 val card = detailedCardsByNumber[summary.maskedCardNumber]
                                     ?: CardResponseDto(
+                                        id = summary.id,
                                         cardNumber = summary.maskedCardNumber,
                                         accountNumber = summary.accountNumber
                                     )

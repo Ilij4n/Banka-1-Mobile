@@ -32,7 +32,7 @@ object Routes {
         data class AccountDetail(val accountNumber: String) : MainFlow
 
         @Serializable
-        data class CardDetail(val accountNumber: String, val cardNumber: String) : MainFlow
+        data class CardDetail(val accountNumber: String, val cardNumber: String, val cardId: Long = 0L) : MainFlow
 
         @Serializable
         data object Transfers : MainFlow

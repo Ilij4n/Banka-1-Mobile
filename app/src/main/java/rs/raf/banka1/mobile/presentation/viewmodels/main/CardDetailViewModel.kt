@@ -4,6 +4,7 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.viewModelScope
 import androidx.navigation.toRoute
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.async
 import kotlinx.coroutines.launch
 import rs.raf.banka1.mobile.data.apis.AccountApi
 import rs.raf.banka1.mobile.data.apis.CardApi
@@ -44,26 +45,45 @@ class CardDetailViewModel @Inject constructor(
         viewModelScope.launch {
             setState { copy(isLoading = true, error = null) }
 
-            when (val result = accountApi.getAccountDetailsByNumber(route.accountNumber)) {
-                is NetworkResult.Success -> {
-                    val account = result.data
-                    val card = account.cards?.firstOrNull { it.cardNumber == route.cardNumber }
-                    setState {
-                        copy(
-                            isLoading = false,
-                            card = card,
-                            account = account
+            if (route.cardId > 0L) {
+                // Preferred path: fetch card directly by ID (avoids account-details cards:[] bug)
+                val cardDeferred = async { cardApi.getCardById(route.cardId) }
+                val accountDeferred = async { accountApi.getAccountDetailsByNumber(route.accountNumber) }
+
+                val cardResult = cardDeferred.await()
+                val accountResult = accountDeferred.await()
+
+                val account = (accountResult as? NetworkResult.Success)?.data
+
+                when (cardResult) {
+                    is NetworkResult.Success -> {
+                        val dto = cardResult.data
+                        // Map CardDetailDto → CardResponseDto so the existing screen composables work
+                        val card = CardResponseDto(
+                            id = dto.id,
+                            cardNumber = dto.cardNumber,
+                            cardType = dto.cardType,
+                            status = dto.status,
+                            expiryDate = dto.expirationDate,
+                            accountNumber = dto.accountNumber
                         )
+                        setState { copy(isLoading = false, card = card, account = account) }
                     }
+                    is NetworkResult.Error -> setState { copy(isLoading = false, error = cardResult.toErrorData()) }
+                    is NetworkResult.Exception -> setState { copy(isLoading = false, error = cardResult.toErrorData()) }
+                    is NetworkResult.Ignored -> setState { copy(isLoading = false) }
                 }
-                is NetworkResult.Error -> {
-                    setState { copy(isLoading = false, error = result.toErrorData()) }
-                }
-                is NetworkResult.Exception -> {
-                    setState { copy(isLoading = false, error = result.toErrorData()) }
-                }
-                is NetworkResult.Ignored -> {
-                    setState { copy(isLoading = false) }
+            } else {
+                // Fallback: try to find the card inside account-details (only works if backend populates it)
+                when (val result = accountApi.getAccountDetailsByNumber(route.accountNumber)) {
+                    is NetworkResult.Success -> {
+                        val account = result.data
+                        val card = account.cards?.firstOrNull { it.cardNumber == route.cardNumber }
+                        setState { copy(isLoading = false, card = card, account = account) }
+                    }
+                    is NetworkResult.Error -> setState { copy(isLoading = false, error = result.toErrorData()) }
+                    is NetworkResult.Exception -> setState { copy(isLoading = false, error = result.toErrorData()) }
+                    is NetworkResult.Ignored -> setState { copy(isLoading = false) }
                 }
             }
         }
@@ -81,15 +101,9 @@ class CardDetailViewModel @Inject constructor(
                     setState { copy(isBlocking = false, showBlockDialog = false) }
                     loadCard()
                 }
-                is NetworkResult.Error -> {
-                    setState { copy(isBlocking = false, showBlockDialog = false, error = result.toErrorData()) }
-                }
-                is NetworkResult.Exception -> {
-                    setState { copy(isBlocking = false, showBlockDialog = false, error = result.toErrorData()) }
-                }
-                is NetworkResult.Ignored -> {
-                    setState { copy(isBlocking = false, showBlockDialog = false) }
-                }
+                is NetworkResult.Error -> setState { copy(isBlocking = false, showBlockDialog = false, error = result.toErrorData()) }
+                is NetworkResult.Exception -> setState { copy(isBlocking = false, showBlockDialog = false, error = result.toErrorData()) }
+                is NetworkResult.Ignored -> setState { copy(isBlocking = false, showBlockDialog = false) }
             }
         }
     }

@@ -19,6 +19,11 @@ interface CardApi {
         @Path("cardNumber") cardNumber: String
     ): NetworkResult<CardDetailDto>
 
+    @GET("api/cards/id/{cardId}")
+    suspend fun getCardById(
+        @Path("cardId") cardId: Long
+    ): NetworkResult<CardDetailDto>
+
     @PUT("api/cards/id/{cardId}/block")
     suspend fun blockCard(
         @Path("cardId") cardId: Long

@@ -104,9 +104,9 @@ fun NavGraphBuilder.mainNavGraph(navController: NavController) {
                         launchSingleTop = true
                     }
                 },
-                onNavigateToCardDetail = { accountNumber, cardNumber ->
+                onNavigateToCardDetail = { accountNumber, cardNumber, cardId ->
                     navController.navigate(
-                        Routes.MainFlow.CardDetail(accountNumber, cardNumber)
+                        Routes.MainFlow.CardDetail(accountNumber, cardNumber, cardId)
                     ) {
                         launchSingleTop = true
                     }
