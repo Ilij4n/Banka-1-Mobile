@@ -22,6 +22,7 @@ import rs.raf.banka1.mobile.data.apis.CardApi
 import rs.raf.banka1.mobile.data.apis.ClientApi
 import rs.raf.banka1.mobile.data.apis.ExchangeApi
 import rs.raf.banka1.mobile.data.apis.ListingApi
+import rs.raf.banka1.mobile.data.apis.LoanApi
 import rs.raf.banka1.mobile.data.apis.OrderApi
 import rs.raf.banka1.mobile.data.apis.PriceAlertApi
 import rs.raf.banka1.mobile.data.apis.TransactionApi
@@ -150,6 +151,12 @@ object NetworkModule {
     @Provides
     fun providePriceAlertApi(retrofit: Retrofit): PriceAlertApi {
         return retrofit.create(PriceAlertApi::class.java)
+    }
+
+    @Singleton
+    @Provides
+    fun provideLoanApi(retrofit: Retrofit): LoanApi {
+        return retrofit.create(LoanApi::class.java)
     }
 
     @Singleton

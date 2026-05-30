@@ -24,6 +24,7 @@ import rs.raf.banka1.mobile.presentation.screens.history.TransferDetailScreen
 import rs.raf.banka1.mobile.presentation.screens.main.VerificationScreen
 import rs.raf.banka1.mobile.presentation.screens.ips.IpsHubScreen
 import rs.raf.banka1.mobile.presentation.screens.notifications.NotificationsScreen
+import rs.raf.banka1.mobile.presentation.screens.loans.LoansScreen
 import rs.raf.banka1.mobile.presentation.screens.orders.MyOrdersScreen
 import rs.raf.banka1.mobile.presentation.screens.pricealerts.PriceAlertsScreen
 import rs.raf.banka1.mobile.presentation.screens.payments.PaymentScreen
@@ -211,6 +212,13 @@ fun NavGraphBuilder.mainNavGraph(navController: NavController) {
         composable<Routes.MainFlow.MyOrders> {
             MyOrdersScreen(
                 viewModel = hiltViewModel()
+            )
+        }
+
+        composable<Routes.MainFlow.Loans> {
+            LoansScreen(
+                viewModel = hiltViewModel(),
+                onNavigateBack = { navController.popBackStack() }
             )
         }
 

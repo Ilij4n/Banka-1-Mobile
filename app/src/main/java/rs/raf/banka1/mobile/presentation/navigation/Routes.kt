@@ -50,6 +50,9 @@ object Routes {
         data object MyOrders : MainFlow
 
         @Serializable
+        data object Loans : MainFlow
+
+        @Serializable
         data object Notifications : MainFlow
 
         @Serializable

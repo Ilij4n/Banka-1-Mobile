@@ -17,6 +17,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AccountBalance
+import androidx.compose.material.icons.filled.AccountBalanceWallet
 import androidx.compose.material.icons.filled.AccountCircle
 import androidx.compose.material.icons.filled.CurrencyExchange
 import androidx.compose.material.icons.filled.Home
@@ -68,6 +69,7 @@ enum class DrawerMenuItem(
     IPS_PAYMENTS(Icons.Default.QrCode, "IPS Plaćanja", Routes.MainFlow.IpsHub),
     HISTORY(Icons.Default.Receipt, "Istorija", Routes.MainFlow.History),
     MY_ORDERS(Icons.AutoMirrored.Filled.ShowChart, "Moji nalozi", Routes.MainFlow.MyOrders),
+    LOANS(Icons.Default.AccountBalanceWallet, "Krediti", Routes.MainFlow.Loans),
     NOTIFICATIONS(Icons.Default.Notifications, "Obavestenja", Routes.MainFlow.Notifications),
     EXCHANGE(Icons.Default.CurrencyExchange, "Menjacnica", Routes.MainFlow.Exchange),
     VERIFICATION(Icons.Default.VerifiedUser, "Verifikacija", Routes.MainFlow.Verification),
