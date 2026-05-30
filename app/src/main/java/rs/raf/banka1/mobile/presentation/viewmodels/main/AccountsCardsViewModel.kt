@@ -4,6 +4,7 @@ import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.launch
 import rs.raf.banka1.mobile.data.apis.AccountApi
+import rs.raf.banka1.mobile.data.apis.CardApi
 import rs.raf.banka1.mobile.data.remote.NetworkResult
 import rs.raf.banka1.mobile.data.remote.responses.AccountDetailsResponseDto
 import rs.raf.banka1.mobile.data.remote.responses.CardResponseDto
@@ -13,7 +14,8 @@ import javax.inject.Inject
 
 @HiltViewModel
 class AccountsCardsViewModel @Inject constructor(
-    private val accountApi: AccountApi
+    private val accountApi: AccountApi,
+    private val cardApi: CardApi
 ) : BaseMviViewModel<AccountsCardsContract.UiState, AccountsCardsContract.UiEvent, AccountsCardsContract.SideEffect>(
     AccountsCardsContract.UiState()
 ) {
@@ -38,8 +40,7 @@ class AccountsCardsViewModel @Inject constructor(
                 is NetworkResult.Success -> {
                     val summaries = result.data.content
 
-                    // List endpoint returns AccountResponseDto (no cards).
-                    // Fetch full details (with cards) per account.
+                    // Fetch full account details (balance, embedded cards if backend provides them)
                     val accounts = summaries.map { summary ->
                         val number = summary.brojRacuna ?: return@map summary
                         when (val detail = accountApi.getAccountDetailsByNumber(number)) {
@@ -48,32 +49,65 @@ class AccountsCardsViewModel @Inject constructor(
                         }
                     }
 
-                    val cards = accounts.flatMap { account ->
-                        (account.cards ?: emptyList()).map { card ->
-                            CardWithAccount(
-                                card = card,
-                                accountName = account.nazivRacuna ?: account.brojRacuna ?: "",
-                                accountId = account.vlasnik
-                            )
+                    // Index any cards the account-details endpoint already returned.
+                    // These carry the full CardResponseDto (id, status, cardType, expiryDate)
+                    // which is needed for the block feature.
+                    val detailedCardsByNumber: Map<String, CardResponseDto> = accounts
+                        .flatMap { it.cards ?: emptyList() }
+                        .filter { it.cardNumber != null }
+                        .associateBy { it.cardNumber!! }
+
+                    // Use CardApi as the definitive card list — it works even when the
+                    // account-details endpoint does not populate the cards field.
+                    val clientId = accounts.firstOrNull()?.vlasnik
+                    val cards: List<CardWithAccount> = if (clientId != null) {
+                        when (val cardResult = cardApi.getClientCards(clientId)) {
+                            is NetworkResult.Success -> cardResult.data.map { summary ->
+                                val account = accounts.find { it.brojRacuna == summary.accountNumber }
+                                // Prefer the enriched card from account-details (full info + id);
+                                // fall back to a minimal stub when account-details had no cards.
+                                val card = detailedCardsByNumber[summary.maskedCardNumber]
+                                    ?: CardResponseDto(
+                                        cardNumber = summary.maskedCardNumber,
+                                        accountNumber = summary.accountNumber
+                                    )
+                                CardWithAccount(
+                                    card = card,
+                                    accountName = account?.nazivRacuna
+                                        ?: account?.brojRacuna
+                                        ?: summary.accountNumber
+                                        ?: "",
+                                    accountId = clientId
+                                )
+                            }
+                            // CardApi failed — fall back to whatever account-details gave us
+                            else -> detailedCardsByNumber.values.map { card ->
+                                val account = accounts.find { it.brojRacuna == card.accountNumber }
+                                CardWithAccount(
+                                    card = card,
+                                    accountName = account?.nazivRacuna ?: account?.brojRacuna ?: "",
+                                    accountId = account?.vlasnik
+                                )
+                            }
+                        }
+                    } else {
+                        // No client ID available — use whatever account-details returned
+                        accounts.flatMap { account ->
+                            (account.cards ?: emptyList()).map { card ->
+                                CardWithAccount(
+                                    card = card,
+                                    accountName = account.nazivRacuna ?: account.brojRacuna ?: "",
+                                    accountId = account.vlasnik
+                                )
+                            }
                         }
                     }
-                    setState {
-                        copy(
-                            isLoading = false,
-                            accounts = accounts,
-                            cards = cards
-                        )
-                    }
+
+                    setState { copy(isLoading = false, accounts = accounts, cards = cards) }
                 }
-                is NetworkResult.Error -> {
-                    setState { copy(isLoading = false, error = result.toErrorData()) }
-                }
-                is NetworkResult.Exception -> {
-                    setState { copy(isLoading = false, error = result.toErrorData()) }
-                }
-                is NetworkResult.Ignored -> {
-                    setState { copy(isLoading = false) }
-                }
+                is NetworkResult.Error -> setState { copy(isLoading = false, error = result.toErrorData()) }
+                is NetworkResult.Exception -> setState { copy(isLoading = false, error = result.toErrorData()) }
+                is NetworkResult.Ignored -> setState { copy(isLoading = false) }
             }
         }
     }
