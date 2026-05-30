@@ -136,7 +136,7 @@ fun NotificationsScreen(
                                 if (!notification.isRead) {
                                     onEvent(NotificationsContract.UiEvent.MarkRead(notification.id))
                                 }
-                                if (notification.orderId != null) {
+                                if (notification.orderId != null && notification.type != "ORDER_RECURRING_SKIPPED") {
                                     onNavigateToOrders()
                                 }
                             },
