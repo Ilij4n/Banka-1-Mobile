@@ -17,6 +17,13 @@ interface ExchangeApi {
         @Path("currencyCode") currencyCode: String
     ): NetworkResult<ExchangeRateDto>
 
+    @GET("exchange/rates/{currencyCode}/history")
+    suspend fun getRateHistory(
+        @Path("currencyCode") currencyCode: String,
+        @Query("from") from: String,
+        @Query("to") to: String
+    ): NetworkResult<List<ExchangeRateDto>>
+
     @GET("exchange/calculate")
     suspend fun calculateConversion(
         @Query("fromCurrency") fromCurrency: String,

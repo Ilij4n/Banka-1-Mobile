@@ -10,6 +10,7 @@ import rs.raf.banka1.mobile.data.remote.NetworkResult
 import rs.raf.banka1.mobile.data.remote.responses.ExchangeRateDto
 import rs.raf.banka1.mobile.presentation.components.ErrorData
 import rs.raf.banka1.mobile.presentation.viewmodels.BaseMviViewModel
+import java.time.LocalDate
 import javax.inject.Inject
 
 @HiltViewModel
@@ -22,11 +23,13 @@ class ExchangeViewModel @Inject constructor(
 
     init {
         loadRates()
+        loadHistory("EUR")
     }
 
     override fun setEvent(event: ExchangeContract.UiEvent) {
         when (event) {
             is ExchangeContract.UiEvent.Refresh -> loadRates()
+            is ExchangeContract.UiEvent.SelectCurrency -> loadHistory(event.code)
         }
     }
 
@@ -37,7 +40,6 @@ class ExchangeViewModel @Inject constructor(
             when (val result = exchangeApi.getRates()) {
                 is NetworkResult.Success -> {
                     val rates = result.data.filter { it.currencyCode != "RSD" }
-                    // Cache locally
                     val entities = rates.mapNotNull { dto ->
                         val code = dto.currencyCode ?: return@mapNotNull null
                         ExchangeRateEntity(
@@ -51,7 +53,6 @@ class ExchangeViewModel @Inject constructor(
                     setState { copy(isLoading = false, rates = rates) }
                 }
                 is NetworkResult.Error -> {
-                    // Try cached
                     val cached = loadCached()
                     setState { copy(isLoading = false, rates = cached, error = result.toErrorData()) }
                 }
@@ -62,6 +63,20 @@ class ExchangeViewModel @Inject constructor(
                 is NetworkResult.Ignored -> {
                     setState { copy(isLoading = false) }
                 }
+            }
+        }
+    }
+
+    private fun loadHistory(code: String) {
+        viewModelScope.launch {
+            setState { copy(selectedCurrency = code, isLoadingHistory = true) }
+            val to = LocalDate.now()
+            val from = to.minusDays(30)
+            when (val result = exchangeApi.getRateHistory(code, from.toString(), to.toString())) {
+                is NetworkResult.Success -> setState { copy(isLoadingHistory = false, historyPoints = result.data) }
+                is NetworkResult.Error -> setState { copy(isLoadingHistory = false, historyPoints = emptyList()) }
+                is NetworkResult.Exception -> setState { copy(isLoadingHistory = false, historyPoints = emptyList()) }
+                is NetworkResult.Ignored -> setState { copy(isLoadingHistory = false) }
             }
         }
     }
@@ -84,11 +99,15 @@ interface ExchangeContract {
     data class UiState(
         val isLoading: Boolean = false,
         val rates: List<ExchangeRateDto> = emptyList(),
-        val error: ErrorData? = null
+        val error: ErrorData? = null,
+        val selectedCurrency: String? = "EUR",
+        val historyPoints: List<ExchangeRateDto> = emptyList(),
+        val isLoadingHistory: Boolean = false
     )
 
     sealed interface UiEvent {
         data object Refresh : UiEvent
+        data class SelectCurrency(val code: String) : UiEvent
     }
 
     sealed interface SideEffect
