@@ -135,7 +135,12 @@ fun NavGraphBuilder.mainNavGraph(navController: NavController) {
         composable<Routes.MainFlow.CardDetail> {
             CardDetailScreen(
                 viewModel = hiltViewModel(),
-                onNavigateBack = { navController.popBackStack() }
+                onNavigateBack = { navController.popBackStack() },
+                onNavigateToCardHistory = { accountNumber, cardLabel ->
+                    navController.navigate(
+                        Routes.MainFlow.History(accountNumber, cardLabel)
+                    ) { launchSingleTop = true }
+                }
             )
         }
 
@@ -178,18 +183,21 @@ fun NavGraphBuilder.mainNavGraph(navController: NavController) {
                     }
                 },
                 onNavigateToTransactionDetail = { transaction ->
-                    // Create a Moshi instance (or use Gson().toJson(transaction))
                     val moshi = Moshi.Builder()
                         .add(KotlinJsonAdapterFactory())
                         .build()
 
                     val json = moshi.adapter(TransactionResponseDto::class.java).toJson(transaction)
-
-                    // Encode the JSON to be safe for URI paths
                     val encodedJson = Uri.encode(json)
 
                     navController.navigate(Routes.MainFlow.TransactionDetail(encodedJson)) {
                         launchSingleTop = true
+                    }
+                },
+                onClearFilter = {
+                    navController.navigate(Routes.MainFlow.History()) {
+                        launchSingleTop = true
+                        popUpTo(Routes.MainFlow.History::class) { inclusive = true }
                     }
                 }
             )

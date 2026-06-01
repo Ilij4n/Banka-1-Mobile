@@ -67,7 +67,7 @@ enum class DrawerMenuItem(
     ACCOUNTS(Icons.Default.AccountBalance, "Racuni i kartice", Routes.MainFlow.Accounts),
     PAYMENTS(Icons.Default.Payment, "Placanja", Routes.MainFlow.Payments()),
     IPS_PAYMENTS(Icons.Default.QrCode, "IPS Plaćanja", Routes.MainFlow.IpsHub),
-    HISTORY(Icons.Default.Receipt, "Istorija", Routes.MainFlow.History),
+    HISTORY(Icons.Default.Receipt, "Istorija", Routes.MainFlow.History()),
     MY_ORDERS(Icons.AutoMirrored.Filled.ShowChart, "Moji nalozi", Routes.MainFlow.MyOrders),
     LOANS(Icons.Default.AccountBalanceWallet, "Krediti", Routes.MainFlow.Loans),
     NOTIFICATIONS(Icons.Default.Notifications, "Obavestenja", Routes.MainFlow.Notifications),

@@ -44,7 +44,10 @@ object Routes {
         data object IpsHub : MainFlow
 
         @Serializable
-        data object History : MainFlow
+        data class History(
+            val accountNumber: String? = null,
+            val cardLabel: String? = null
+        ) : MainFlow
 
         @Serializable
         data object MyOrders : MainFlow

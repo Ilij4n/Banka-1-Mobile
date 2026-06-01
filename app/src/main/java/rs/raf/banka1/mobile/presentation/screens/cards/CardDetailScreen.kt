@@ -25,6 +25,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.AccountBalance
 import androidx.compose.material.icons.filled.Block
 import androidx.compose.material.icons.filled.CreditCard
+import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -68,7 +69,8 @@ import kotlin.math.roundToInt
 @Composable
 fun CardDetailScreen(
     viewModel: CardDetailViewModel,
-    onNavigateBack: () -> Unit
+    onNavigateBack: () -> Unit,
+    onNavigateToCardHistory: (accountNumber: String, cardLabel: String) -> Unit = { _, _ -> }
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
 
@@ -152,7 +154,8 @@ fun CardDetailScreen(
                 CardDetailContent(
                     card = state.card!!,
                     account = state.account,
-                    onBlockClick = { viewModel.setEvent(CardDetailContract.UiEvent.ShowBlockDialog) }
+                    onBlockClick = { viewModel.setEvent(CardDetailContract.UiEvent.ShowBlockDialog) },
+                    onNavigateToCardHistory = onNavigateToCardHistory
                 )
             }
         }
@@ -163,7 +166,8 @@ fun CardDetailScreen(
 private fun CardDetailContent(
     card: CardResponseDto,
     account: AccountDetailsResponseDto?,
-    onBlockClick: () -> Unit
+    onBlockClick: () -> Unit,
+    onNavigateToCardHistory: (accountNumber: String, cardLabel: String) -> Unit
 ) {
     val animProgress = remember { Animatable(0f) }
     LaunchedEffect(Unit) {
@@ -231,6 +235,27 @@ private fun CardDetailContent(
                     InfoRow("Naziv racuna", account.nazivRacuna ?: "-")
                     InfoRow("Broj racuna", formatAccountNumber(account.brojRacuna ?: ""))
                     InfoRow("Valuta", account.currency ?: "-")
+                }
+            }
+
+            // History button
+            if (account?.brojRacuna != null) {
+                Button(
+                    onClick = {
+                        onNavigateToCardHistory(
+                            account.brojRacuna,
+                            formatMaskedCardNumber(card.cardNumber ?: "")
+                        )
+                    },
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.History,
+                        contentDescription = null,
+                        modifier = Modifier.size(18.dp)
+                    )
+                    Spacer(Modifier.width(8.dp))
+                    Text("Istorija transakcija po kartici")
                 }
             }
 

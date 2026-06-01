@@ -27,6 +27,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ReceiptLong
 import androidx.compose.material.icons.filled.ArrowDownward
 import androidx.compose.material.icons.filled.ArrowUpward
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Payments
 import androidx.compose.material.icons.filled.Receipt
 import androidx.compose.material.icons.filled.SwapHoriz
@@ -34,6 +35,7 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Tab
 import androidx.compose.material3.TabRow
@@ -70,7 +72,8 @@ import kotlin.math.roundToInt
 fun HistoryScreen(
     viewModel: HistoryViewModel,
     onNavigateToTransferDetail: (orderNumber: String, fromCurrency: String, toCurrency: String) -> Unit,
-    onNavigateToTransactionDetail: (TransactionResponseDto) -> Unit
+    onNavigateToTransactionDetail: (TransactionResponseDto) -> Unit,
+    onClearFilter: () -> Unit
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val onEvent = viewModel::setEvent
@@ -111,6 +114,14 @@ fun HistoryScreen(
                 text = "Pregled vasih transfera i transakcija",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+
+        if (state.isFiltered) {
+            FilterBanner(
+                label = state.cardLabel ?: "",
+                onClear = onClearFilter,
+                modifier = Modifier.padding(horizontal = 16.dp).padding(bottom = 8.dp)
             )
         }
 
@@ -537,6 +548,39 @@ private fun TransactionRow(
                     )
                 }
             }
+        }
+    }
+}
+
+// --- Filter Banner ---
+
+@Composable
+private fun FilterBanner(
+    label: String,
+    onClear: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(10.dp))
+            .background(MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f))
+            .padding(horizontal = 12.dp, vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(
+            text = "Prikaz za karticu: $label",
+            style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.SemiBold),
+            color = MaterialTheme.colorScheme.onPrimaryContainer,
+            modifier = Modifier.weight(1f)
+        )
+        IconButton(onClick = onClear, modifier = Modifier.size(24.dp)) {
+            Icon(
+                imageVector = Icons.Default.Close,
+                contentDescription = "Ukloni filter",
+                tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                modifier = Modifier.size(16.dp)
+            )
         }
     }
 }
