@@ -31,6 +31,8 @@ import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.AccountBalance
 import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.HourglassEmpty
+import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -432,41 +434,111 @@ private fun PaymentOtpStep(
             }
         }
 
-        Spacer(modifier = Modifier.height(4.dp))
-
-        OtpInputField(
-            value = state.otpCode,
-            onValueChange = { onEvent(PaymentContract.UiEvent.FieldChanged(PaymentContract.Field.Otp, it)) },
-            label = "6-cifreni kod",
-            error = state.fieldErrors[PaymentContract.Field.Otp],
-            onDone = { if (state.otpCode.length == 6) onEvent(PaymentContract.UiEvent.SubmitPayment) }
-        )
-
-        TextButton(
-            onClick = { onEvent(PaymentContract.UiEvent.OpenVerificationCodes) }
-        ) {
-            Text(
-                text = "Kod stiže kao notifikacija. Pogledaj sve kodove →",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.primary
-            )
+        // Expired banner — replaces normal form when session is dead
+        if (state.otpExpired) {
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = MaterialTheme.shapes.medium,
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer)
+            ) {
+                Row(
+                    modifier = Modifier.padding(16.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Warning,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onErrorContainer
+                    )
+                    Column {
+                        Text(
+                            text = "Zahtev je istekao",
+                            style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
+                            color = MaterialTheme.colorScheme.onErrorContainer
+                        )
+                        Text(
+                            text = "Pošaljite novi kod i pokušajte ponovo.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onErrorContainer
+                        )
+                    }
+                }
+            }
         }
 
-        Spacer(modifier = Modifier.height(4.dp))
+        if (!state.otpExpired) {
+            Spacer(modifier = Modifier.height(4.dp))
 
-        Button(
-            onClick = { onEvent(PaymentContract.UiEvent.SubmitPayment) },
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(52.dp),
-            enabled = !state.isLoading && state.otpCode.length == 6,
-            shape = MaterialTheme.shapes.medium,
-            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
-        ) {
-            Text(
-                text = "Plati",
-                style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.SemiBold)
+            // Hint: user can approve directly from the notification
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = MaterialTheme.shapes.medium,
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer)
+            ) {
+                Row(
+                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.HourglassEmpty,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onSecondaryContainer,
+                        modifier = Modifier.size(18.dp)
+                    )
+                    Text(
+                        text = if (state.awaitingApproval)
+                            "Čekamo odobrenje… Možete odobriti i direktno sa notifikacije, bez unosa koda."
+                        else
+                            "Možete odobriti i direktno sa notifikacije, bez unosa koda.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSecondaryContainer
+                    )
+                    if (state.awaitingApproval) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(14.dp),
+                            strokeWidth = 2.dp,
+                            color = MaterialTheme.colorScheme.onSecondaryContainer
+                        )
+                    }
+                }
+            }
+
+            OtpInputField(
+                value = state.otpCode,
+                onValueChange = { onEvent(PaymentContract.UiEvent.FieldChanged(PaymentContract.Field.Otp, it)) },
+                label = "6-cifreni kod",
+                error = state.fieldErrors[PaymentContract.Field.Otp],
+                onDone = { if (state.otpCode.length == 6) onEvent(PaymentContract.UiEvent.SubmitPayment) }
             )
+
+            TextButton(
+                onClick = { onEvent(PaymentContract.UiEvent.OpenVerificationCodes) }
+            ) {
+                Text(
+                    text = "Kod stiže kao notifikacija. Pogledaj sve kodove →",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.primary
+                )
+            }
+
+            Spacer(modifier = Modifier.height(4.dp))
+
+            Button(
+                onClick = { onEvent(PaymentContract.UiEvent.SubmitPayment) },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(52.dp),
+                enabled = !state.isLoading && state.otpCode.length == 6,
+                shape = MaterialTheme.shapes.medium,
+                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
+            ) {
+                Text(
+                    text = "Plati",
+                    style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.SemiBold)
+                )
+            }
         }
 
         OutlinedButton(
@@ -485,7 +557,7 @@ private fun PaymentOtpStep(
                 )
             } else {
                 Text(
-                    text = "Pošalji kod ponovo",
+                    text = if (state.otpExpired) "Pošalji novi kod" else "Pošalji kod ponovo",
                     style = MaterialTheme.typography.labelLarge
                 )
             }

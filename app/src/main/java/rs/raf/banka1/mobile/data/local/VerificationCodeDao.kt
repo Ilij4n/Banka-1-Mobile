@@ -20,6 +20,9 @@ interface VerificationCodeDao {
     @Query("UPDATE verification_codes SET isUsed = 1 WHERE id = :id")
     suspend fun markUsed(id: Long)
 
+    @Query("UPDATE verification_codes SET isUsed = 1 WHERE sessionId = :sessionId")
+    suspend fun markUsedBySessionId(sessionId: String)
+
     @Query("DELETE FROM verification_codes WHERE id = :id")
     suspend fun deleteById(id: Long)
 
