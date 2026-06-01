@@ -1,8 +1,6 @@
 package rs.raf.banka1.mobile.presentation.screens.history
 
 import androidx.compose.animation.Crossfade
-import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -15,7 +13,6 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -43,18 +40,15 @@ import androidx.compose.material3.TabRowDefaults
 import androidx.compose.material3.TabRowDefaults.tabIndicatorOffset
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -66,7 +60,6 @@ import rs.raf.banka1.mobile.presentation.viewmodels.main.HistoryTab
 import rs.raf.banka1.mobile.presentation.viewmodels.main.HistoryViewModel
 import java.text.NumberFormat
 import java.util.Locale
-import kotlin.math.roundToInt
 
 @Composable
 fun HistoryScreen(
@@ -250,35 +243,17 @@ private fun TransfersList(
         itemsIndexed(
             items = transfers,
             key = { index, transfer -> transfer.orderNumber ?: "transfer_$index" }
-        ) { index, transfer ->
-            val animProgress = remember { Animatable(0f) }
-            LaunchedEffect(Unit) {
-                animProgress.animateTo(
-                    1f,
-                    animationSpec = tween(
-                        durationMillis = 300,
-                        delayMillis = index * 50,
-                        easing = FastOutSlowInEasing
-                    )
-                )
-            }
-
-            Box(
-                modifier = Modifier
-                    .offset { IntOffset(0, ((1f - animProgress.value) * 24f * density).roundToInt()) }
-                    .alpha(animProgress.value)
-            ) {
-                TransferRow(
-                    transfer = transfer,
-                    accountCurrencies = accountCurrencies, // Pass map
-                    formatter = formatter,
-                    onClick = {
-                        val fromCurr = accountCurrencies[transfer.fromAccountNumber] ?: "RSD"
-                        val toCurr = accountCurrencies[transfer.toAccountNumber] ?: "RSD"
-                        onTransferClick(transfer.orderNumber ?: "", fromCurr, toCurr)
-                    }
-                )
-            }
+        ) { _, transfer ->
+            TransferRow(
+                transfer = transfer,
+                accountCurrencies = accountCurrencies,
+                formatter = formatter,
+                onClick = {
+                    val fromCurr = accountCurrencies[transfer.fromAccountNumber] ?: "RSD"
+                    val toCurr = accountCurrencies[transfer.toAccountNumber] ?: "RSD"
+                    onTransferClick(transfer.orderNumber ?: "", fromCurr, toCurr)
+                }
+            )
         }
 
         item { Spacer(Modifier.height(16.dp)) }
@@ -423,30 +398,12 @@ private fun TransactionsList(
         itemsIndexed(
             items = transactions,
             key = { index, tx -> tx.orderNumber ?: "tx_$index" }
-        ) { index, transaction ->
-            val animProgress = remember { Animatable(0f) }
-            LaunchedEffect(Unit) {
-                animProgress.animateTo(
-                    1f,
-                    animationSpec = tween(
-                        durationMillis = 300,
-                        delayMillis = index * 50,
-                        easing = FastOutSlowInEasing
-                    )
-                )
-            }
-
-            Box(
-                modifier = Modifier
-                    .offset { IntOffset(0, ((1f - animProgress.value) * 24f * density).roundToInt()) }
-                    .alpha(animProgress.value)
-            ) {
-                TransactionRow(
-                    transaction = transaction,
-                    formatter = formatter,
-                    onClick = { onTransactionClick(transaction) }
-                )
-            }
+        ) { _, transaction ->
+            TransactionRow(
+                transaction = transaction,
+                formatter = formatter,
+                onClick = { onTransactionClick(transaction) }
+            )
         }
 
         item { Spacer(Modifier.height(16.dp)) }
