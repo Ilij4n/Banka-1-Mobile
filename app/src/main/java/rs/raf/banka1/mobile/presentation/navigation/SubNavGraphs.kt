@@ -24,7 +24,9 @@ import rs.raf.banka1.mobile.presentation.screens.history.TransferDetailScreen
 import rs.raf.banka1.mobile.presentation.screens.main.VerificationScreen
 import rs.raf.banka1.mobile.presentation.screens.ips.IpsHubScreen
 import rs.raf.banka1.mobile.presentation.screens.notifications.NotificationsScreen
+import rs.raf.banka1.mobile.presentation.screens.loans.LoansScreen
 import rs.raf.banka1.mobile.presentation.screens.orders.MyOrdersScreen
+import rs.raf.banka1.mobile.presentation.screens.pricealerts.PriceAlertsScreen
 import rs.raf.banka1.mobile.presentation.screens.payments.PaymentScreen
 import rs.raf.banka1.mobile.presentation.screens.profile.ProfileScreen
 
@@ -102,9 +104,9 @@ fun NavGraphBuilder.mainNavGraph(navController: NavController) {
                         launchSingleTop = true
                     }
                 },
-                onNavigateToCardDetail = { accountNumber, cardNumber ->
+                onNavigateToCardDetail = { accountNumber, cardNumber, cardId ->
                     navController.navigate(
-                        Routes.MainFlow.CardDetail(accountNumber, cardNumber)
+                        Routes.MainFlow.CardDetail(accountNumber, cardNumber, cardId)
                     ) {
                         launchSingleTop = true
                     }
@@ -133,7 +135,12 @@ fun NavGraphBuilder.mainNavGraph(navController: NavController) {
         composable<Routes.MainFlow.CardDetail> {
             CardDetailScreen(
                 viewModel = hiltViewModel(),
-                onNavigateBack = { navController.popBackStack() }
+                onNavigateBack = { navController.popBackStack() },
+                onNavigateToCardHistory = { accountNumber, cardLabel ->
+                    navController.navigate(
+                        Routes.MainFlow.History(accountNumber, cardLabel)
+                    ) { launchSingleTop = true }
+                }
             )
         }
 
@@ -176,18 +183,21 @@ fun NavGraphBuilder.mainNavGraph(navController: NavController) {
                     }
                 },
                 onNavigateToTransactionDetail = { transaction ->
-                    // Create a Moshi instance (or use Gson().toJson(transaction))
                     val moshi = Moshi.Builder()
                         .add(KotlinJsonAdapterFactory())
                         .build()
 
                     val json = moshi.adapter(TransactionResponseDto::class.java).toJson(transaction)
-
-                    // Encode the JSON to be safe for URI paths
                     val encodedJson = Uri.encode(json)
 
                     navController.navigate(Routes.MainFlow.TransactionDetail(encodedJson)) {
                         launchSingleTop = true
+                    }
+                },
+                onClearFilter = {
+                    navController.navigate(Routes.MainFlow.History()) {
+                        launchSingleTop = true
+                        popUpTo(Routes.MainFlow.History::class) { inclusive = true }
                     }
                 }
             )
@@ -213,6 +223,13 @@ fun NavGraphBuilder.mainNavGraph(navController: NavController) {
             )
         }
 
+        composable<Routes.MainFlow.Loans> {
+            LoansScreen(
+                viewModel = hiltViewModel(),
+                onNavigateBack = { navController.popBackStack() }
+            )
+        }
+
         composable<Routes.MainFlow.Notifications> {
             NotificationsScreen(
                 viewModel = hiltViewModel(),
@@ -220,7 +237,19 @@ fun NavGraphBuilder.mainNavGraph(navController: NavController) {
                     navController.navigate(Routes.MainFlow.MyOrders) {
                         launchSingleTop = true
                     }
+                },
+                onNavigateToPriceAlerts = {
+                    navController.navigate(Routes.MainFlow.PriceAlerts) {
+                        launchSingleTop = true
+                    }
                 }
+            )
+        }
+
+        composable<Routes.MainFlow.PriceAlerts> {
+            PriceAlertsScreen(
+                viewModel = hiltViewModel(),
+                onNavigateBack = { navController.popBackStack() }
             )
         }
 

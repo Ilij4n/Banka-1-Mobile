@@ -49,6 +49,10 @@ android {
         targetCompatibility = JavaVersion.VERSION_11
     }
 
+    testOptions {
+        unitTests.isReturnDefaultValues = true
+    }
+
     kotlinOptions {
         jvmTarget = "11"
     }
@@ -69,6 +73,14 @@ dependencies {
     implementation(libs.androidx.compose.ui.tooling.preview)
     implementation(libs.androidx.compose.material3)
     testImplementation(libs.junit)
+    testImplementation(libs.junit.jupiter.api)
+    testRuntimeOnly(libs.junit.jupiter.engine)
+    testRuntimeOnly(libs.junit.vintage.engine)
+    testRuntimeOnly("org.junit.platform:junit-platform-launcher:1.10.1")
+    testImplementation(libs.kotlinx.coroutines.test)
+    testImplementation(libs.turbine)
+    testImplementation(libs.assertk)
+    testImplementation(libs.mockk)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
     androidTestImplementation(platform(libs.androidx.compose.bom))
@@ -125,4 +137,8 @@ dependencies {
     // QR Code
     implementation(libs.quickie.bundled)
     implementation(libs.zxing.core)
+}
+
+tasks.withType<Test> {
+    useJUnitPlatform()
 }

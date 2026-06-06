@@ -6,6 +6,8 @@ import androidx.lifecycle.viewModelScope
 import com.squareup.moshi.Moshi
 import com.squareup.moshi.kotlin.reflect.KotlinJsonAdapterFactory
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import rs.raf.banka1.mobile.data.apis.AccountApi
@@ -22,6 +24,7 @@ import rs.raf.banka1.mobile.domain.ips.IpsStringParser
 import rs.raf.banka1.mobile.presentation.components.ErrorData
 import rs.raf.banka1.mobile.presentation.viewmodels.BaseMviViewModel
 import java.util.UUID
+import java.util.concurrent.atomic.AtomicBoolean
 import javax.inject.Inject
 
 @HiltViewModel
@@ -38,6 +41,12 @@ class PaymentViewModel @Inject constructor(
 
     private val moshi = Moshi.Builder().add(KotlinJsonAdapterFactory()).build()
     private val ipsAdapter = moshi.adapter(IpsFields::class.java)
+
+    private var pollingJob: Job? = null
+    private val completionStarted = AtomicBoolean(false)
+
+    // Total polls covering the 5-minute window at 2-second intervals
+    private val TOTAL_POLLS = (5 * 60 * 1000L / 2_000L).toInt()
 
     init {
         prefillFromIpsPayload()
@@ -70,7 +79,6 @@ class PaymentViewModel @Inject constructor(
                 fieldErrors = emptyMap()
             )
         }
-        // Prefer an RSD/tekuci account if accounts are already loaded.
         val accounts = state.value.accounts
         if (accounts.isNotEmpty()) {
             val rsd = accounts.filter { (it.currency ?: "").equals("RSD", ignoreCase = true) }
@@ -101,12 +109,34 @@ class PaymentViewModel @Inject constructor(
             is PaymentContract.UiEvent.RequestOtp -> requestOtp()
             is PaymentContract.UiEvent.SubmitPayment -> submitPayment()
             is PaymentContract.UiEvent.ResendOtp -> resendOtp()
-            is PaymentContract.UiEvent.BackToForm -> setState { copy(step = PaymentContract.Step.FORM, otpCode = "", remainingOtpAttempts = null) }
+            is PaymentContract.UiEvent.BackToForm -> {
+                cancelPolling()
+                setState {
+                    copy(
+                        step = PaymentContract.Step.FORM,
+                        otpCode = "",
+                        remainingOtpAttempts = null,
+                        awaitingApproval = false,
+                        otpExpired = false
+                    )
+                }
+            }
             is PaymentContract.UiEvent.ClearError -> setState { copy(error = null) }
             is PaymentContract.UiEvent.OpenVerificationCodes -> sendEffect { PaymentContract.SideEffect.OpenVerificationCodes }
             is PaymentContract.UiEvent.DismissResult -> setState { copy(paymentResult = null) }
             is PaymentContract.UiEvent.IpsQrScanned -> handleIpsQrScanned(event.rawString)
         }
+    }
+
+    override fun onCleared() {
+        super.onCleared()
+        pollingJob?.cancel()
+    }
+
+    private fun cancelPolling() {
+        pollingJob?.cancel()
+        pollingJob = null
+        completionStarted.set(false)
     }
 
     private fun loadAccounts() {
@@ -202,14 +232,61 @@ class PaymentViewModel @Inject constructor(
                 clientEmail = clientData.email
             )
             when (val result = verificationApi.generate(request)) {
-                is NetworkResult.Success -> setState {
-                    copy(isLoading = false, sessionId = result.data.sessionId, step = PaymentContract.Step.OTP)
+                is NetworkResult.Success -> {
+                    val sid = result.data.sessionId
+                    cancelPolling()
+                    setState {
+                        copy(
+                            isLoading = false,
+                            sessionId = sid,
+                            step = PaymentContract.Step.OTP,
+                            awaitingApproval = true,
+                            otpExpired = false
+                        )
+                    }
+                    startStatusPolling(sid)
                 }
                 is NetworkResult.Error -> setState { copy(isLoading = false, error = result.toErrorData()) }
                 is NetworkResult.Exception -> setState { copy(isLoading = false, error = result.toErrorData()) }
                 is NetworkResult.Ignored -> setState { copy(isLoading = false) }
             }
         }
+    }
+
+    private fun startStatusPolling(sessionId: Long) {
+        pollingJob = viewModelScope.launch {
+            repeat(TOTAL_POLLS) {
+                delay(2_000)
+                when (val statusResult = verificationApi.getSessionStatus(sessionId)) {
+                    is NetworkResult.Success -> {
+                        when (statusResult.data.status) {
+                            "VERIFIED" -> {
+                                completeIfVerified(sessionId)
+                                return@launch
+                            }
+                            "EXPIRED", "CANCELLED" -> {
+                                setState { copy(awaitingApproval = false, otpExpired = true) }
+                                return@launch
+                            }
+                            else -> {} // PENDING — keep polling
+                        }
+                    }
+                    else -> {} // network hiccup — keep polling
+                }
+            }
+            // 5-minute window exhausted
+            setState { copy(awaitingApproval = false, otpExpired = true) }
+        }
+    }
+
+    private suspend fun completeIfVerified(sessionId: Long) {
+        if (!completionStarted.compareAndSet(false, true)) {
+            // Another path already fired completion (e.g. typed code validated first)
+            setState { copy(isLoading = false) }
+            return
+        }
+        setState { copy(awaitingApproval = false, isLoading = true) }
+        doPayment(state.value, sessionId)
     }
 
     private fun resendOtp() {
@@ -229,8 +306,20 @@ class PaymentViewModel @Inject constructor(
                 clientEmail = clientData.email
             )
             when (val result = verificationApi.generate(request)) {
-                is NetworkResult.Success -> setState {
-                    copy(isResending = false, sessionId = result.data.sessionId, otpCode = "", remainingOtpAttempts = null)
+                is NetworkResult.Success -> {
+                    val newSid = result.data.sessionId
+                    cancelPolling()
+                    setState {
+                        copy(
+                            isResending = false,
+                            sessionId = newSid,
+                            otpCode = "",
+                            remainingOtpAttempts = null,
+                            awaitingApproval = true,
+                            otpExpired = false
+                        )
+                    }
+                    startStatusPolling(newSid)
                 }
                 is NetworkResult.Error -> setState { copy(isResending = false, error = result.toErrorData()) }
                 is NetworkResult.Exception -> setState { copy(isResending = false, error = result.toErrorData()) }
@@ -251,7 +340,7 @@ class PaymentViewModel @Inject constructor(
                 is NetworkResult.Success -> {
                     val response = validateResult.data
                     if (response.status == "VERIFIED") {
-                        doPayment(s, sessionId)
+                        completeIfVerified(sessionId)
                     } else {
                         setState {
                             copy(
@@ -262,7 +351,16 @@ class PaymentViewModel @Inject constructor(
                         }
                     }
                 }
-                is NetworkResult.Error -> setState { copy(isLoading = false, error = validateResult.toErrorData()) }
+                is NetworkResult.Error -> {
+                    // ERR_VERIFICATION_003 means the session was already verified via another path
+                    // (e.g. background polling + doPayment that then failed). Proceed directly to
+                    // payment instead of surfacing a confusing "already verified" error to the user.
+                    if (validateResult.code == "ERR_VERIFICATION_003") {
+                        completeIfVerified(sessionId)
+                    } else {
+                        setState { copy(isLoading = false, error = validateResult.toErrorData()) }
+                    }
+                }
                 is NetworkResult.Exception -> setState { copy(isLoading = false, error = validateResult.toErrorData()) }
                 is NetworkResult.Ignored -> setState { copy(isLoading = false) }
             }
@@ -286,8 +384,16 @@ class PaymentViewModel @Inject constructor(
                 val data = result.data
                 setState { copy(isLoading = false, paymentResult = data) }
             }
-            is NetworkResult.Error -> setState { copy(isLoading = false, error = result.toErrorData()) }
-            is NetworkResult.Exception -> setState { copy(isLoading = false, error = result.toErrorData()) }
+            is NetworkResult.Error -> {
+                // Reset so the user can retry — the verification session stays VERIFIED and can
+                // be reused for another attempt (only the payment step failed, not verification).
+                completionStarted.set(false)
+                setState { copy(isLoading = false, error = result.toErrorData()) }
+            }
+            is NetworkResult.Exception -> {
+                completionStarted.set(false)
+                setState { copy(isLoading = false, error = result.toErrorData()) }
+            }
             is NetworkResult.Ignored -> setState { copy(isLoading = false) }
         }
     }
@@ -315,7 +421,9 @@ interface PaymentContract {
         val fieldErrors: Map<Field, String> = emptyMap(),
         val remainingOtpAttempts: Int? = null,
         val error: ErrorData? = null,
-        val paymentResult: rs.raf.banka1.mobile.data.remote.responses.NewPaymentResponseDto? = null
+        val paymentResult: rs.raf.banka1.mobile.data.remote.responses.NewPaymentResponseDto? = null,
+        val awaitingApproval: Boolean = false,
+        val otpExpired: Boolean = false,
     )
 
     sealed interface UiEvent {

@@ -49,14 +49,14 @@ class BankMessagingService : FirebaseMessagingService() {
 
     companion object {
         private const val TAG = "BankMessagingService"
-        private const val CHANNEL_ID = "verification_codes"
+        const val CHANNEL_ID = "verification_codes"
         private const val CHANNEL_NAME = "Verifikacioni kodovi"
         private const val ORDER_CHANNEL_ID = "order_notifications"
         private const val ORDER_CHANNEL_NAME = "Obavestenja o nalozima"
         private const val PRICE_ALERT_CHANNEL_ID = "price_alerts"
         private const val PRICE_ALERT_CHANNEL_NAME = "Cenovni alarmi"
-        private const val OTP_VALIDITY_MILLIS = 5 * 60 * 1000L // 5 minutes
-        private const val NOTIFICATION_ID = 1001
+        const val OTP_VALIDITY_MILLIS = 5 * 60 * 1000L // 5 minutes
+        const val NOTIFICATION_ID = 1001
         private const val ORDER_NOTIFICATION_ID = 1002
         private const val PRICE_ALERT_NOTIFICATION_ID = 1003
     }
@@ -92,7 +92,6 @@ class BankMessagingService : FirebaseMessagingService() {
         val now = System.currentTimeMillis()
 
         appScope.launch {
-            // Always persist to Room so code is available when user opens the app
             verificationCodeDao.insert(
                 VerificationCodeEntity(
                     code = code,
@@ -103,18 +102,22 @@ class BankMessagingService : FirebaseMessagingService() {
                 )
             )
 
-            // Only show system notification if user is currently logged in
             val isLoggedIn = userPreferencesRepository.readClientData().firstOrNull() != null
             if (isLoggedIn) {
-                showVerificationNotification(operationType)
+                showVerificationNotification(operationType, code, sessionId)
             }
         }
     }
 
     private fun handleOrderNotification(type: String, data: Map<String, String>) {
-        val title = data["title"]?.takeIf { it.isNotBlank() } ?: "Obavestenje o nalogu"
-        val body = data["body"]?.takeIf { it.isNotBlank() }
-            ?: ("Status naloga: " + (data["status"] ?: ""))
+        val title = data["title"]?.takeIf { it.isNotBlank() } ?: when (type) {
+            "ORDER_RECURRING_SKIPPED" -> "Periodicni nalog preskocen"
+            else -> "Obavestenje o nalogu"
+        }
+        val body = data["body"]?.takeIf { it.isNotBlank() } ?: when (type) {
+            "ORDER_RECURRING_SKIPPED" -> "Vas periodicni nalog nije izvrsen zbog nedovoljnih sredstava."
+            else -> "Status naloga: " + (data["status"] ?: "")
+        }
         val orderId = data["orderId"]?.toLongOrNull()
         val now = System.currentTimeMillis()
 
@@ -176,10 +179,9 @@ class BankMessagingService : FirebaseMessagingService() {
         }
     }
 
-    private fun showVerificationNotification(operationType: String) {
+    private fun showVerificationNotification(operationType: String, code: String, sessionId: String) {
         val notificationManager = getSystemService(NOTIFICATION_SERVICE) as NotificationManager
 
-        // Create channel (required for Android 8.0+)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val channel = NotificationChannel(
                 CHANNEL_ID,
@@ -191,13 +193,12 @@ class BankMessagingService : FirebaseMessagingService() {
             notificationManager.createNotificationChannel(channel)
         }
 
-        val intent = Intent(this, MainActivity::class.java).apply {
+        val openAppIntent = Intent(this, MainActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
             putExtra("navigate_to", "verification")
         }
-
-        val pendingIntent = PendingIntent.getActivity(
-            this, 0, intent,
+        val contentPendingIntent = PendingIntent.getActivity(
+            this, 0, openAppIntent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
@@ -217,17 +218,42 @@ class BankMessagingService : FirebaseMessagingService() {
             drawable?.draw(canvas)
         }
 
-        val notification = NotificationCompat.Builder(this, CHANNEL_ID)
+        val builder = NotificationCompat.Builder(this, CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_notification)
             .setLargeIcon(largeIcon)
             .setContentTitle("Verifikacioni kod")
-            .setContentText("Novi verifikacioni kod za $opLabel - otvorite aplikaciju")
+            .setContentText("Zahtev za $opLabel — odobrite ili otvorite aplikaciju")
             .setPriority(NotificationCompat.PRIORITY_HIGH)
             .setAutoCancel(true)
-            .setContentIntent(pendingIntent)
-            .build()
+            .setContentIntent(contentPendingIntent)
+            .setTimeoutAfter(OTP_VALIDITY_MILLIS)
 
-        notificationManager.notify(NOTIFICATION_ID, notification)
+        // Add one-tap Approve action when we have a valid sessionId.
+        // validate is intentionally not JWT-bound on the backend — owner identity
+        // is proven by possession of the push, so this works even when the app is killed.
+        if (sessionId.isNotEmpty()) {
+            val approveIntent = Intent(this, QuickApproveReceiver::class.java).apply {
+                putExtra(QuickApproveReceiver.EXTRA_SESSION_ID, sessionId)
+                putExtra(QuickApproveReceiver.EXTRA_CODE, code)
+                putExtra(QuickApproveReceiver.EXTRA_OPERATION_TYPE, operationType)
+                putExtra(QuickApproveReceiver.EXTRA_NOTIFICATION_ID, NOTIFICATION_ID)
+            }
+            val approvePendingIntent = PendingIntent.getBroadcast(
+                this,
+                sessionId.hashCode(),
+                approveIntent,
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            )
+            builder.addAction(
+                NotificationCompat.Action.Builder(
+                    R.drawable.ic_notification,
+                    "Odobri",
+                    approvePendingIntent
+                ).build()
+            )
+        }
+
+        notificationManager.notify(NOTIFICATION_ID, builder.build())
     }
 
     private fun showOrderNotification(title: String, body: String) {

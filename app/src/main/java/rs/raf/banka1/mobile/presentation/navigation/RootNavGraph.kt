@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Menu
+import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.QrCodeScanner
 import androidx.compose.material3.DrawerValue
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -202,11 +203,19 @@ fun RootNavGraph(
                         },
                         actions = {
                             val onScan = topBarScanAction.value
-                            when {
-                                isOnDashboard -> IpsTopBarAction(
+                            if (isOnDashboard) {
+                                IconButton(onClick = { navController.navigate(Routes.MainFlow.Notifications) }) {
+                                    Icon(
+                                        imageVector = Icons.Default.Notifications,
+                                        contentDescription = "Obavestenja",
+                                        tint = MaterialTheme.colorScheme.onPrimaryContainer
+                                    )
+                                }
+                                IpsTopBarAction(
                                     onClick = { navController.navigate(Routes.MainFlow.IpsHub) }
                                 )
-                                onScan != null -> IpsTopBarAction(onClick = onScan)
+                            } else if (onScan != null) {
+                                IpsTopBarAction(onClick = onScan)
                             }
                         },
                         colors = TopAppBarDefaults.topAppBarColors(

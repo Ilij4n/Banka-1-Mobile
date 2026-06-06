@@ -5,6 +5,9 @@ import com.squareup.moshi.JsonClass
 
 @JsonClass(generateAdapter = true)
 data class CardSummaryDto(
+    @field:Json(name = "id")
+    val id: Long? = null,
+
     @field:Json(name = "maskedCardNumber")
     val maskedCardNumber: String? = null,
 
@@ -14,6 +17,9 @@ data class CardSummaryDto(
 
 @JsonClass(generateAdapter = true)
 data class CardDetailDto(
+    @field:Json(name = "id")
+    val id: Long? = null,
+
     @field:Json(name = "cardNumber")
     val cardNumber: String? = null,
 

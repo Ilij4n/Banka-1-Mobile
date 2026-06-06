@@ -32,7 +32,7 @@ object Routes {
         data class AccountDetail(val accountNumber: String) : MainFlow
 
         @Serializable
-        data class CardDetail(val accountNumber: String, val cardNumber: String) : MainFlow
+        data class CardDetail(val accountNumber: String, val cardNumber: String, val cardId: Long = 0L) : MainFlow
 
         @Serializable
         data object Transfers : MainFlow
@@ -44,13 +44,22 @@ object Routes {
         data object IpsHub : MainFlow
 
         @Serializable
-        data object History : MainFlow
+        data class History(
+            val accountNumber: String? = null,
+            val cardLabel: String? = null
+        ) : MainFlow
 
         @Serializable
         data object MyOrders : MainFlow
 
         @Serializable
+        data object Loans : MainFlow
+
+        @Serializable
         data object Notifications : MainFlow
+
+        @Serializable
+        data object PriceAlerts : MainFlow
 
         @Serializable
         data class TransferDetail(

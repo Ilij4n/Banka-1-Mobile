@@ -1,6 +1,7 @@
 package rs.raf.banka1.mobile.data.apis
 
 import retrofit2.http.GET
+import retrofit2.http.PUT
 import retrofit2.http.Path
 import rs.raf.banka1.mobile.data.remote.NetworkResult
 import rs.raf.banka1.mobile.data.remote.responses.CardDetailDto
@@ -17,4 +18,14 @@ interface CardApi {
     suspend fun getCardDetails(
         @Path("cardNumber") cardNumber: String
     ): NetworkResult<CardDetailDto>
+
+    @GET("api/cards/id/{cardId}")
+    suspend fun getCardById(
+        @Path("cardId") cardId: Long
+    ): NetworkResult<CardDetailDto>
+
+    @PUT("api/cards/id/{cardId}/block")
+    suspend fun blockCard(
+        @Path("cardId") cardId: Long
+    ): NetworkResult<Unit>
 }

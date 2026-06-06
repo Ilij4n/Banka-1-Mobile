@@ -1,6 +1,8 @@
 package rs.raf.banka1.mobile.presentation.viewmodels.main
 
+import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.viewModelScope
+import androidx.navigation.toRoute
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
@@ -14,6 +16,7 @@ import rs.raf.banka1.mobile.data.remote.responses.TransactionResponseDto
 import rs.raf.banka1.mobile.data.remote.responses.TransferResponseDto
 import rs.raf.banka1.mobile.data.repository.UserPreferencesRepository
 import rs.raf.banka1.mobile.presentation.components.ErrorData
+import rs.raf.banka1.mobile.presentation.navigation.Routes
 import rs.raf.banka1.mobile.presentation.viewmodels.BaseMviViewModel
 import javax.inject.Inject
 import kotlin.collections.flatten
@@ -22,13 +25,21 @@ import kotlin.collections.flatten
 class HistoryViewModel @Inject constructor(
     private val transferApi: TransferApi,
     private val transactionApi: TransactionApi,
-    private val accountApi: AccountApi, // Add AccountApi here
-    private val userPreferencesRepository: UserPreferencesRepository
+    private val accountApi: AccountApi,
+    private val userPreferencesRepository: UserPreferencesRepository,
+    savedStateHandle: SavedStateHandle
 ) : BaseMviViewModel<HistoryContract.UiState, HistoryContract.UiEvent, HistoryContract.SideEffect>(
     HistoryContract.UiState()
 ) {
+    private val route = savedStateHandle.toRoute<Routes.MainFlow.History>()
 
     init {
+        setState {
+            copy(
+                cardLabel = route.cardLabel,
+                isFiltered = route.accountNumber != null
+            )
+        }
         loadData()
     }
 
@@ -41,6 +52,52 @@ class HistoryViewModel @Inject constructor(
     }
 
     private fun loadData() {
+        if (route.accountNumber != null) {
+            loadForAccount(route.accountNumber)
+        } else {
+            loadAllAccounts()
+        }
+    }
+
+    private fun loadForAccount(accountNumber: String) {
+        viewModelScope.launch {
+            setState { copy(isLoading = true, error = null) }
+
+            val transfersDeferred = async {
+                transferApi.getTransfersForAccount(accountNumber, 0, 100)
+            }
+            val transactionsDeferred = async {
+                transactionApi.getTransactionsForAccount(accountNumber, 0, 100)
+            }
+
+            val transfersResult = transfersDeferred.await()
+            val transactionsResult = transactionsDeferred.await()
+
+            val transfers = when (transfersResult) {
+                is NetworkResult.Success -> transfersResult.data.content
+                else -> emptyList()
+            }
+            val transactions = when (transactionsResult) {
+                is NetworkResult.Success -> transactionsResult.data.content
+                else -> emptyList()
+            }
+
+            val firstError = listOf(transfersResult, transactionsResult)
+                .filterIsInstance<NetworkResult.Error<*>>()
+                .firstOrNull()
+
+            setState {
+                copy(
+                    isLoading = false,
+                    transfers = transfers.sortedByDescending { it.timestamp ?: "" },
+                    transactions = transactions.sortedByDescending { it.createdAt ?: "" },
+                    error = firstError?.toErrorData()
+                )
+            }
+        }
+    }
+
+    private fun loadAllAccounts() {
         viewModelScope.launch {
             setState { copy(isLoading = true, error = null) }
 
@@ -49,46 +106,39 @@ class HistoryViewModel @Inject constructor(
                 setState {
                     copy(
                         isLoading = false,
-                        error = ErrorData(
-                            title = "Greska",
-                            message = "Nije moguce ucitati istoriju."
-                        )
+                        error = ErrorData(title = "Greska", message = "Nije moguce ucitati istoriju.")
                     )
                 }
                 return@launch
             }
 
-            // 1. Fetch Transfers
-            val transfers = when (val result = transferApi.getTransfers(clientId = clientId, page = 0, size = 100)) {
-                is NetworkResult.Success -> result.data.content
-                is NetworkResult.Error -> {
-                    setState { copy(isLoading = false, error = result.toErrorData()) }
-                    return@launch
-                }
-                is NetworkResult.Exception -> {
-                    setState { copy(isLoading = false, error = result.toErrorData()) }
-                    return@launch
-                }
-                is NetworkResult.Ignored -> {
-                    setState { copy(isLoading = false) }
-                    return@launch
-                }
+            val transfersDeferred = async {
+                transferApi.getTransfers(clientId = clientId, page = 0, size = 100)
+            }
+            val accountsDeferred = async {
+                accountApi.getMyAccounts(page = 0, size = 100)
             }
 
-            val accountsResult = accountApi.getMyAccounts(page = 0, size = 100)
-            val accountCurrencies = mutableMapOf<String, String>()
+            val transfersResult = transfersDeferred.await()
+            val accountsResult = accountsDeferred.await()
 
-            val transactions = when (accountsResult) {
+            val transfers = when (transfersResult) {
+                is NetworkResult.Success -> transfersResult.data.content
+                else -> emptyList()
+            }
+
+            val accountCurrencies = mutableMapOf<String, String>()
+            val transactions: List<TransactionResponseDto>
+
+            when (accountsResult) {
                 is NetworkResult.Success -> {
                     val accountNumbers = accountsResult.data.content.mapNotNull { account ->
-                        // Populate the currency map for later use!
                         if (account.brojRacuna != null && account.currency != null) {
                             accountCurrencies[account.brojRacuna] = account.currency
                         }
                         account.brojRacuna
                     }
 
-                    // 3. Fetch Transactions for all accounts concurrently
                     val deferredTransactions = accountNumbers.map { accountNumber ->
                         async {
                             transactionApi.getTransactionsForAccount(
@@ -99,31 +149,27 @@ class HistoryViewModel @Inject constructor(
                         }
                     }
 
-                    // Await all and flatten the successful results
-                    deferredTransactions.awaitAll().mapNotNull { result ->
-                        if (result is NetworkResult.Success) result.data.content else null
-                    }.flatten().distinctBy { it.orderNumber }
+                    transactions = deferredTransactions.awaitAll()
+                        .mapNotNull { result ->
+                            if (result is NetworkResult.Success) result.data.content else null
+                        }
+                        .flatten()
+                        .distinctBy { it.orderNumber }
                 }
-                is NetworkResult.Error -> {
-                    setState { copy(isLoading = false, error = accountsResult.toErrorData()) }
-                    return@launch
-                }
-                is NetworkResult.Exception -> {
-                    setState { copy(isLoading = false, error = accountsResult.toErrorData()) }
-                    return@launch
-                }
-                is NetworkResult.Ignored -> {
-                    setState { copy(isLoading = false) }
-                    return@launch
-                }
+                else -> transactions = emptyList()
             }
+
+            val firstError = listOf(transfersResult, accountsResult)
+                .filterIsInstance<NetworkResult.Error<*>>()
+                .firstOrNull()
 
             setState {
                 copy(
                     isLoading = false,
                     transfers = transfers.sortedByDescending { it.timestamp ?: "" },
                     transactions = transactions.sortedByDescending { it.createdAt ?: "" },
-                    accountCurrencies = accountCurrencies // Save the map to state!
+                    accountCurrencies = accountCurrencies,
+                    error = firstError?.toErrorData()
                 )
             }
         }
@@ -139,6 +185,8 @@ interface HistoryContract {
         val transfers: List<TransferResponseDto> = emptyList(),
         val transactions: List<TransactionResponseDto> = emptyList(),
         val accountCurrencies: Map<String, String> = emptyMap(),
+        val cardLabel: String? = null,
+        val isFiltered: Boolean = false,
         val error: ErrorData? = null
     )
 
