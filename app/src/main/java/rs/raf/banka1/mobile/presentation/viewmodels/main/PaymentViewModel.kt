@@ -351,7 +351,16 @@ class PaymentViewModel @Inject constructor(
                         }
                     }
                 }
-                is NetworkResult.Error -> setState { copy(isLoading = false, error = validateResult.toErrorData()) }
+                is NetworkResult.Error -> {
+                    // ERR_VERIFICATION_003 means the session was already verified via another path
+                    // (e.g. background polling + doPayment that then failed). Proceed directly to
+                    // payment instead of surfacing a confusing "already verified" error to the user.
+                    if (validateResult.code == "ERR_VERIFICATION_003") {
+                        completeIfVerified(sessionId)
+                    } else {
+                        setState { copy(isLoading = false, error = validateResult.toErrorData()) }
+                    }
+                }
                 is NetworkResult.Exception -> setState { copy(isLoading = false, error = validateResult.toErrorData()) }
                 is NetworkResult.Ignored -> setState { copy(isLoading = false) }
             }
@@ -375,8 +384,16 @@ class PaymentViewModel @Inject constructor(
                 val data = result.data
                 setState { copy(isLoading = false, paymentResult = data) }
             }
-            is NetworkResult.Error -> setState { copy(isLoading = false, error = result.toErrorData()) }
-            is NetworkResult.Exception -> setState { copy(isLoading = false, error = result.toErrorData()) }
+            is NetworkResult.Error -> {
+                // Reset so the user can retry — the verification session stays VERIFIED and can
+                // be reused for another attempt (only the payment step failed, not verification).
+                completionStarted.set(false)
+                setState { copy(isLoading = false, error = result.toErrorData()) }
+            }
+            is NetworkResult.Exception -> {
+                completionStarted.set(false)
+                setState { copy(isLoading = false, error = result.toErrorData()) }
+            }
             is NetworkResult.Ignored -> setState { copy(isLoading = false) }
         }
     }

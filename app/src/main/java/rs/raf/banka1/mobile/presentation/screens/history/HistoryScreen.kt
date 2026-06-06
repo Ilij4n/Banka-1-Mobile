@@ -242,7 +242,7 @@ private fun TransfersList(
     ) {
         itemsIndexed(
             items = transfers,
-            key = { index, transfer -> transfer.orderNumber ?: "transfer_$index" }
+            key = { index, transfer -> transfer.orderNumber?.takeIf { it.isNotBlank() } ?: "transfer_$index" }
         ) { _, transfer ->
             TransferRow(
                 transfer = transfer,
@@ -397,7 +397,7 @@ private fun TransactionsList(
     ) {
         itemsIndexed(
             items = transactions,
-            key = { index, tx -> tx.orderNumber ?: "tx_$index" }
+            key = { index, tx -> tx.orderNumber?.takeIf { it.isNotBlank() } ?: "tx_$index" }
         ) { _, transaction ->
             TransactionRow(
                 transaction = transaction,
